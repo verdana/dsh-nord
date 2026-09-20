@@ -1,0 +1,9 @@
+# dsh-nord bundle layer.
+#
+# The row names the package, not a path: after
+# `dsh plugin --profile <name> add ./dsh-nord` the Loader resolves it from the
+# profile's own node_modules. Replace with a file:// URL only when loading the
+# checkout build through a `--patch` overlay.
+- insert:
+    - id: dsh-nord
+      name: 'dsh-nord'
