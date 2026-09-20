@@ -122,13 +122,17 @@ export function apply(ctx: ClientContext): void {
   }, NordCard))
 
   // Balance polling. The bar binds its actions when the slot declares, which
-  // can land after this effect runs, so the restart hook is shared.
+  // can land after this effect runs, so the restart hooks are shared.
   let balanceBound: BoundActions<typeof balanceStore> | undefined
-  let restartBalance = (): void => {}
+  /** Restart only when a field the poll reads has actually moved. */
+  let syncBalance = (): void => {}
+  /** Restart unconditionally, for the first read the bar can receive. */
+  let bindBalance = (): void => {}
 
   ctx.effect(() => {
     let timer: ReturnType<typeof setInterval> | undefined
     let generation = 0
+    let applied: Config | undefined
     const stop = (): void => {
       if (timer === undefined) return
       clearInterval(timer)
@@ -151,9 +155,8 @@ export function apply(ctx: ClientContext): void {
       }
     }
 
-    restartBalance = (): void => {
+    const start = (value: Config): void => {
       stop()
-      const value = effective()
       if (!value.balanceEnabled) {
         balanceBound?.clear()
         return
@@ -162,13 +165,36 @@ export function apply(ctx: ClientContext): void {
       timer = setInterval(() => { void refresh() }, value.refreshSeconds * 1000)
     }
 
-    const unsubscribe = scope.subscribe(restartBalance)
-    restartBalance()
+    // One accepted write publishes twice (the optimistic value, then the Host's
+    // confirmed one), and a theme or font write touches no field the poll reads.
+    // Comparing against the last applied config keeps both from re-querying
+    // upstream.
+    syncBalance = (): void => {
+      const value = effective()
+      if (applied !== undefined
+        && applied.balanceEnabled === value.balanceEnabled
+        && applied.refreshSeconds === value.refreshSeconds
+        && applied.baseURL === value.baseURL) return
+      applied = value
+      start(value)
+    }
+
+    // The initial read is issued before the bar can bind its actions, so its
+    // result has nowhere to land; the bind issues the one that counts.
+    bindBalance = (): void => {
+      const value = effective()
+      applied = value
+      start(value)
+    }
+
+    const unsubscribe = scope.subscribe(syncBalance)
+    syncBalance()
     return () => {
       unsubscribe()
       stop()
       generation += 1
-      restartBalance = () => {}
+      syncBalance = () => {}
+      bindBalance = () => {}
     }
   }, 'dsh-nord: balance polling')
 
@@ -180,7 +206,7 @@ export function apply(ctx: ClientContext): void {
     store: balanceStore,
     inject: (_sessionId, actions: BoundActions<typeof balanceStore>) => {
       balanceBound = actions
-      restartBalance()
+      bindBalance()
       return {}
     },
   }, BalanceBar))

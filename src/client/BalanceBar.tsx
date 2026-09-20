@@ -53,6 +53,25 @@ function BalanceIcon() {
 }
 
 /**
+ * Absolute read time through the dictionary's date template. `toLocaleString`
+ * would follow the browser language rather than the app locale, and print
+ * mixed-language text after a locale switch.
+ * @param fetchedAt - epoch milliseconds of the read.
+ * @param t - this namespace's translate seat.
+ * @returns the localized date and minute.
+ */
+function stampLabel(fetchedAt: number, t: BalanceBarProps['t']): string {
+  const at = new Date(fetchedAt)
+  const pad2 = (value: number): string => String(value).padStart(2, '0')
+  return t('balance.dialog.stamp', {
+    y: at.getFullYear(),
+    m: at.getMonth() + 1,
+    d: at.getDate(),
+    time: `${pad2(at.getHours())}:${pad2(at.getMinutes())}`,
+  })
+}
+
+/**
  * Render the balance readout; a successful reading is a button opening the
  * breakdown panel, the pending and failed readings stay plain text.
  * @param props - composed slot props.
@@ -145,7 +164,7 @@ export function BalanceBar({ useStore, t }: BalanceBarProps) {
             <dt>{t('balance.dialog.status')}</dt>
             <dd>{available ? t('balance.dialog.available') : t('balance.insufficient')}</dd>
             <dt>{t('balance.dialog.updated')}</dt>
-            <dd>{new Date(fetchedAt).toLocaleString()}</dd>
+            <dd>{stampLabel(fetchedAt, t)}</dd>
           </dl>
         </div>,
         document.body,

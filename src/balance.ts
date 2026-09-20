@@ -37,3 +37,42 @@ export interface BalanceFailure {
 export function isBalanceFailure(value: BalancePayload | BalanceFailure): value is BalanceFailure {
   return 'error' in value
 }
+
+/** Upstream `/user/balance` document, read field by field at the JSON boundary. */
+export interface BalanceDocument {
+  /** Whether the account can currently serve requests. */
+  is_available?: unknown
+  /** Per-currency balance entries; the first one is the account's. */
+  balance_infos?: unknown
+}
+
+/** One `balance_infos` entry, as the upstream spells it. */
+interface BalanceInfo {
+  currency?: unknown
+  total_balance?: unknown
+  granted_balance?: unknown
+  topped_up_balance?: unknown
+}
+
+/**
+ * Project one upstream document onto the payload the browser renders. Every
+ * field is read defensively: the document comes from a third-party HTTP
+ * response, and the browser half has no way to recover from a bad projection.
+ * @param document - parsed upstream JSON.
+ * @param fetchedAt - epoch milliseconds of the read.
+ * @returns the payload, or undefined when the document carries no balance entry.
+ */
+export function parseBalance(document: BalanceDocument, fetchedAt: number): BalancePayload | undefined {
+  const infos = Array.isArray(document.balance_infos) ? document.balance_infos : []
+  const entry: unknown = infos[0]
+  if (typeof entry !== 'object' || entry === null) return undefined
+  const info = entry as BalanceInfo
+  return {
+    currency: typeof info.currency === 'string' ? info.currency : 'CNY',
+    total: String(info.total_balance ?? '0'),
+    granted: String(info.granted_balance ?? '0'),
+    toppedUp: String(info.topped_up_balance ?? '0'),
+    available: document.is_available !== false,
+    fetchedAt,
+  }
+}

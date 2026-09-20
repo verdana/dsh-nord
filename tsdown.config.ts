@@ -1,7 +1,9 @@
 /**
- * Two build faces for one out-of-tree plugin:
+ * Three build faces for one out-of-tree plugin:
  *
  * - `src/index.ts`        → `lib/index.js`   the Node half the Loader mounts.
+ * - `src/balance.ts`      → `lib/balance.js` the balance projection on its own,
+ *   so `npm test` runs it under plain Node without booting the plugin.
  * - `src/client/index.ts` → `lib/client.js`  the browser half the Web shell
  *   fetches through the `/plugins` combo route.
  *
@@ -37,7 +39,7 @@ const isPlatformModule = (specifier: string): boolean => PLATFORM_MODULES.includ
 const config: UserConfig[] = [
   {
     name: PACKAGE_NAME,
-    entry: ['src/index.ts'],
+    entry: ['src/index.ts', 'src/balance.ts'],
     outDir: 'lib',
     format: ['esm'],
     platform: 'node',
@@ -68,10 +70,6 @@ const config: UserConfig[] = [
     deps: {
       neverBundle: isPlatformModule,
       alwaysBundle: (specifier: string) => !isPlatformModule(specifier),
-      onlyBundle: [
-        '@deepseek-ai/cosmokit',
-        '@deepseek-ai/schemastery',
-      ],
     },
     outputOptions: {
       // The registry serves `lib/client.js`; clean stays off so this does not

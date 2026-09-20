@@ -9,11 +9,11 @@
 import type { IncomingMessage, ServerResponse } from 'node:http'
 import type { Context } from '@deepseek-ai/cordis'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
-import type {} from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-settings'
-import type { BalanceFailure, BalancePayload } from './balance.ts'
-import { BALANCE_PATH, Config, NS, type Config as NordConfig } from './config.ts'
+import { parseBalance, type BalanceFailure, type BalancePayload } from './balance.ts'
+import { BALANCE_PATH, NS, type Config as NordConfig } from './config.ts'
+import { Config } from './schema.ts'
 
 export const name = 'dsh-nord'
 export { Config }
@@ -23,14 +23,6 @@ const API_KEY_REF = credentialRef('DEEPSEEK_API_KEY')
 
 /** Upstream deadline; the browser receives the failure as an error payload. */
 const REQUEST_TIMEOUT_MS = 15_000
-
-/** Balance fields the upstream document is read for. */
-interface BalanceInfo {
-  currency?: unknown
-  total_balance?: unknown
-  granted_balance?: unknown
-  topped_up_balance?: unknown
-}
 
 /**
  * Mount the settings namespace and the balance route.
@@ -62,7 +54,7 @@ export function apply(ctx: Context, config: NordConfig): void {
  * Answer one balance request.
  * @param ctx - context holding the optional credential provider.
  * @param source - current resolved configuration.
- * @param req - the balance request; its body is not read.
+ * @param req - the balance request; only its method is read.
  * @param res - response owner.
  * @returns completion after the response is ended.
  */
@@ -72,7 +64,12 @@ async function handleBalance(
   req: IncomingMessage,
   res: ServerResponse,
 ): Promise<void> {
-  void req
+  if (req.method !== 'GET') {
+    res.setHeader('allow', 'GET')
+    res.statusCode = 405
+    res.end()
+    return
+  }
   const config = source()
   if (!config.balanceEnabled) return sendJson(res, { error: 'disabled' } satisfies BalanceFailure)
   const credentials = ctx.get('credentials')
@@ -89,26 +86,21 @@ async function handleBalance(
     if (!response.ok) {
       return sendJson(res, { error: 'upstream-failed', status: response.status } satisfies BalanceFailure)
     }
-    const payload = await response.json() as { is_available?: unknown; balance_infos?: unknown }
-    const infos = Array.isArray(payload.balance_infos) ? payload.balance_infos : []
-    const info = infos[0] as BalanceInfo | undefined
-    if (info === undefined) return sendJson(res, { error: 'malformed-response' } satisfies BalanceFailure)
-    return sendJson(res, {
-      currency: typeof info.currency === 'string' ? info.currency : 'CNY',
-      total: String(info.total_balance ?? '0'),
-      granted: String(info.granted_balance ?? '0'),
-      toppedUp: String(info.topped_up_balance ?? '0'),
-      available: payload.is_available !== false,
-      fetchedAt: Date.now(),
-    } satisfies BalancePayload)
+    const payload = parseBalance(await response.json(), Date.now())
+    if (payload === undefined) return sendJson(res, { error: 'malformed-response' } satisfies BalanceFailure)
+    return sendJson(res, payload)
   } catch (error) {
     return sendJson(res, { error: 'request-failed', detail: errorMessage(error) } satisfies BalanceFailure)
   }
 }
 
-/** Write one JSON response. */
+/**
+ * Write one JSON response. The route answers a private account read, so it is
+ * marked uncacheable rather than left to a cache's heuristic.
+ */
 function sendJson(res: ServerResponse, body: BalancePayload | BalanceFailure): void {
   res.setHeader('content-type', 'application/json')
+  res.setHeader('cache-control', 'no-store')
   res.end(JSON.stringify(body))
 }
 

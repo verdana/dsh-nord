@@ -8,6 +8,13 @@
  * three booleans use the shared `Switch` — the design system owns the on/off
  * skin, its focus ring, and its disabled state, which a native checkbox cannot
  * carry.
+ *
+ * The two fields are uncontrolled and keyed by their stored value. A controlled
+ * input bound straight to the stored value cannot be edited: an `onChange` that
+ * refuses the draft produces no update, and React restores the stored value
+ * after every keystroke that did — so an interval passing through a smaller
+ * number (60 → 90) or a half-typed URL could never be entered. The key re-seeds
+ * a field when the stored value lands or changes underneath it.
  */
 import { Input, Switch } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
@@ -84,6 +91,8 @@ export function NordCard({ useStore, t, save }: NordCardProps) {
 
   const disabled = !writable
   const locked = disabled ? t('card.readonly') : undefined
+  // Both fields configure the bar, so they follow its own switch.
+  const fieldDisabled = disabled || !balanceEnabled
   const toggleRow = (
     label: NordKey,
     hint: NordKey,
@@ -120,17 +129,23 @@ export function NordCard({ useStore, t, save }: NordCardProps) {
           <div style={HINT_STYLE}>{t('card.refreshHint')}</div>
         </div>
         <Input
+          key={refreshSeconds}
           type="number"
           min={15}
           max={3600}
           step={1}
-          value={refreshSeconds}
-          disabled={disabled}
+          defaultValue={refreshSeconds}
+          disabled={fieldDisabled}
           aria-label={t('card.refresh')}
           style={INTERVAL_STYLE}
-          onChange={(event) => {
+          onBlur={(event) => {
             const next = Number(event.currentTarget.value)
-            if (Number.isInteger(next) && next >= 15 && next <= 3600) save('refreshSeconds', next)
+            if (Number.isInteger(next) && next >= 15 && next <= 3600) {
+              if (next !== refreshSeconds) save('refreshSeconds', next)
+              return
+            }
+            // The draft never became a writable value; put the field back.
+            event.currentTarget.value = String(refreshSeconds)
           }}
         />
       </div>
@@ -140,13 +155,15 @@ export function NordCard({ useStore, t, save }: NordCardProps) {
           <div style={HINT_STYLE}>{t('card.baseURLHint')}</div>
         </div>
         <Input
+          key={baseURL}
           type="text"
           defaultValue={baseURL}
-          disabled={disabled}
+          disabled={fieldDisabled}
           aria-label={t('card.baseURL')}
           style={URL_STYLE}
           onBlur={(event) => {
             const next = event.currentTarget.value.trim()
+            event.currentTarget.value = next
             if (next !== '' && next !== baseURL) save('baseURL', next)
           }}
         />

@@ -6,19 +6,21 @@
 
 ```
 src/index.ts               Host 半边：设置段 + GET /nord/balance 路由
-src/config.ts              配置 schema、默认值与 NS / BALANCE_PATH 常量
-src/balance.ts             Host ↔ 浏览器之间的余额载荷类型
+src/config.ts              两侧共用的配置类型、默认值与 NS / BALANCE_PATH 常量
+src/schema.ts              Host 独有的 durable schema，唯一 import schemastery 的模块
+src/balance.ts             余额载荷类型，以及上游文档到载荷的投影
 src/client/index.ts        浏览器半边：主题层、字体、样式表、设置卡、余额轮询、两个 slot 注册
 src/client/nord.ts         Nord 调色板（116 token）、字体栈、余额表面的 CSS
 src/client/BalanceBar.tsx  余额读数与其明细面板
 src/client/NordCard.tsx    设置行的开关与字段
 src/client/stores.ts       设置卡与余额的 slot store
 src/client/locales.ts      `dshNord` 命名空间的中英文案
+tests/balance.test.mjs     投影的 `node --test` 规格
 tests/balance-mock.mjs     上游 `/user/balance` 的本地替身
 assets/                    README 截图
 ```
 
-`tsdown.config.ts` 构建两个半边：`src/index.ts` → `lib/index.js`（Node 半边，Loader 挂载），`src/client/index.ts` → `lib/client.js`（浏览器半边，Web shell 经 `/plugins` combo 路由取）。后者必须精确匹配模块系统的线格式：注册 banner/footer 包住的 CJS 体，`module`/`exports` 由 intro 引入。
+`tsdown.config.ts` 构建三个产物：`src/index.ts` → `lib/index.js`（Node 半边，Loader 挂载）、`src/balance.ts` → `lib/balance.js`（投影单独成文件，供 `npm test` 在纯 Node 下跑，不必启动插件）、`src/client/index.ts` → `lib/client.js`（浏览器半边，Web shell 经 `/plugins` combo 路由取）。最后者必须精确匹配模块系统的线格式：注册 banner/footer 包住的 CJS 体，`module`/`exports` 由 intro 引入。
 
 ## 能力与机制一览
 
@@ -27,6 +29,7 @@ assets/                    README 截图
 | Nord 配色 | `ctx.theme.overrideTokens('dsh-nord', tokens)` —— 116 个 token，每个带 `{ light, dark }` 两个值，官方按当前配色自动取值 |
 | Maple Mono 字体 | 一枚 `<style>` 里的 `:root` 规则 |
 | 余额 | Host 侧 `webServer` 上的 `GET /nord/balance`，用 `ctx.credentials` 解析 `DEEPSEEK_API_KEY`；浏览器侧是 dock 里一枚可点击读数 + 明细面板 |
+| 余额投影 | `src/balance.ts` 的 `parseBalance()`：上游文档 → 载荷，Host 路由与 `npm test` 共用同一份实现 |
 | 设置项 | Host `ctx.settings.installSection()` + 浏览器侧 `settings.general.item` 行，持久化进 `settings.yaml` |
 | 设置卡控件 | 模块表基线里的 `@deepseek-ai/dsh-client-ui-primitives`：布尔项用 `Switch`、字段用 `Input`，行距与配色走内联 style |
 | 余额表面的样式 | 插件自己的一枚 `<style>`（`surfaceStylesheet`）：dock 行规则、读数皮肤、面板皮肤 |
@@ -97,6 +100,12 @@ div[data-slot="conversation.composer.dock"]:has(> [data-dsh-nord-bar]) {
 
 轮询不做清屏：`loading` 只在「还没有成功读数」（首次加载或上次失败）时才进入 pending，成功过一次之后原地更新。否则每 15–60 秒会让面板跟着读数一起闪掉一次。
 
+### 为什么 schema 单独一个文件
+
+浏览器半边要 `NS`、`DEFAULTS`、`BALANCE_PATH` 三个值，`Config` 只要类型；而 durable schema 必须 `import z from '@deepseek-ai/schemastery'`。两者原先同住 `src/config.ts`，于是整个 schema 库被内联进 `lib/client.js`——构建产物里 schemastery 占 22,143 字节、cosmokit 占 8,967 字节，合计 44%。把 schema 挪进只有 Host 半边引用的 `src/schema.ts` 之后，`lib/client.js` 从 70.66 kB 降到 40.71 kB（gzip 18.34 kB → 11.15 kB），客户端那份 `deps.onlyBundle` 里已无用的两项也随之删掉。
+
+客户端本来也不需要它：`SettingsScopeSpec` 只接受 `namespace` 与可选的 `decode`，wire section 由 Host 序列化出去的 schema 校验（见 `dsh-client-ui-settings` 的 `settings-contract.d.ts`），浏览器半边不参与校验。
+
 ### 为什么没有 `dependencies` / `peerDependencies`
 
 Host 半边把 `@deepseek-ai/dsh-brand`、`dsh-credentials`、`schemastery` 等全部内联，产物的运行时模块边只有一条 `export { Config, apply, name }`；浏览器半边只 require shell 模块表里的五个 specifier（`react`、`react/jsx-runtime`、`react-dom`、`dsh-client-store`、`dsh-client-ui-primitives`），全部由宿主提供。声明 peer 会让 pnpm 往用户 profile 里再装一份 `ui-theme` / `ui-slots`，反而和 shell 的模块表身份冲突。兼容性因此靠本文记的实测版本，而不是依赖范围。
@@ -117,6 +126,7 @@ Host 半边把 `@deepseek-ai/dsh-brand`、`dsh-credentials`、`schemastery` 等�
 npm install
 npm run dev        # tsdown --watch：保存即重建两个半边（约 40ms）
 npm run typecheck
+npm test           # pretest 先 build，再跑 tests/ 下的投影规格
 npm run build
 ```
 
@@ -141,14 +151,20 @@ DEEPSEEK_API_KEY=test-key dsh --profile web
 
 已经验证过的内容：
 
-- `npm run typecheck`、`npm run build` 通过；`lib/client.js` 只把模块表里的五个 specifier 留作 external，其余内联，banner/intro/footer 符合 `__ModuleLoader__.load({ id: "dsh-nord", … })` 契约并导出 `apply` / `inject`。
+- `npm run typecheck`、`npm run build` 通过；`lib/client.js` 只把模块表里的五个 specifier 留作 external，其余内联，banner/intro/footer 符合 `__ModuleLoader__.load({ id: "dsh-nord", … })` 契约并导出 `apply` / `inject`；产物 40.71 kB（拆出 `src/schema.ts` 之前是 70.66 kB，差的正是内联进来的 schemastery 与 cosmokit）。
+- `npm test` 通过：`tests/balance.test.mjs` 的 8 条规格跑在构建产物 `lib/balance.js` 上，覆盖正常字段、多币种取首条、`is_available` 缺失或为 `false`、条目字段缺失回退、数值型余额、非字符串 `currency`，以及 `balance_infos` 缺失 / 空数组 / 非数组 / 首项非对象都归到 `malformed-response`。
 - 调色板：直接求值 `nordTokens()` 得 116 项（81 alias + 10 specific + 25 static），`--dsw-alias-bg-base` = `{light:#ECEFF4, dark:#2E3440}`。
 - 安装：`dsh plugin add` 后 `dsh.profile.bundles` 追加成功，`--dump-config` 出现 `# == dsh-nord` 层；tarball 安装路径同样验证过（见下节彩排）。
 - 启动：shell 的预载列表含 `dsh-nord/client.js`，combo 路由内容含本包注册与 `dsh-nord-surfaces` 样式表。
 - Host 路由：`GET /nord/balance` 在浏览器会话栅栏后返回 200；无凭据 `{"error":"credentials-missing"}`；接 mock 后返回 `{"currency":"CNY","total":"42.50","granted":"2.50","toppedUp":"40.00","available":true,…}`。
+- 路由的响应头与动词（页面内实测）：GET 200 且 `cache-control: no-store`；`POST` 得到 405、`allow: GET`、空体。
 - 排版（隔离实例 + headless Edge 打开真实页面）：出口节点内联样式仍是 `display: contents`、计算值变成 `flex`；出口的两个子节点是官方 pill 行（`1 轮 1 步`，top 870、高 26、`padding-top` 4）与余额条（top 874、高 22、`margin-top: 4px`、`padding: 1px 8px`、`border-radius: 24px`、图标 16×16），后者计算字号 13px、字体 Maple Mono、行高 20px，两行文字同起于 875。
 - 面板：`role="dialog"`、300×159、位于读数上方 `874 − 8 − 159 = 707`、左边缘与读数对齐，圆角 12、内边距 16、字号 12/18、背景即 Nord `nord4`；四行明细取值正确；Escape 关闭；等过一个刷新周期后面板仍开着、数值不变而更新时间前进。
 - 设置卡（同一套隔离实例）：`通用` 段里只有这三个 `role="switch"` 控件，尺寸 36×20，右边缘与所在行右边缘齐平；每行标签下是 12/18 的说明文字；两个 `Input` 实宽 98 与 262；点「底部余额条」后 `aria-checked` 转 `false` 且 `settings.yaml` 落盘 `dsh-nord: balanceEnabled: false`，再点回 `true` 同样落盘。
+- 设置字段可编辑（同一套隔离实例，键盘实测）：把刷新间隔从 15 改成 90 必须经过中间态 `9`——输入框里依次显示 `9`、`90`，`Tab` 失焦后落盘 `refreshSeconds: 90`；只输入 `9` 再 `Tab` 会弹回 `90`，且不写盘。URL 字段整段换成 `http://127.0.0.1:3099/` 后 `Tab` 落盘 `baseURL`。改成 `defaultValue` + `key` 之前，同一套操作会被 React 还原成原值，字段实际上改不动。
+- 余额轮询不再被无关设置唤醒：空闲 4 秒窗口内 0 次 `/nord/balance`；拨动「Nord 配色」开关关掉再打开，两次点击前后各 0 次（改前每次点击 2 次——一次乐观发布、一次落盘确认各触发一轮重启）。
+- 余额开关联动：关掉「底部余额条」后读数从 dock 消失，同一张卡里的刷新间隔与 API 地址两个字段同时进入禁用态；打开后恢复可编辑。
+- 面板「更新时间」走字典模板：中文界面实测 `2026年9月20日 22:29`（模板 `{y}年{m}月{d}日 {time}`，英文为 `{y}-{m}-{d} {time}`）；改用 `toLocaleString()` 时同一台机器上显示的是浏览器语言的 `2026/9/20 22:19:36`，界面切到英文也不会跟着变。
 - 观感：`assets/` 里的三张截图就是在这套隔离实例里拍的（`01` / `03` 拍在 `0.1.5-rc.1`；`02` 设置卡在 `0.1.5-rc.2` 上重拍，rc.2 的排版实测与上面一致）。
 
 ## 发布到 npm
@@ -190,4 +206,5 @@ dsh --profile tarball                                 # 起来看一眼
 - **没有样式管线。** 仓库内插件用 CSS Modules + 共享 `--dsw-*` token，由仓库的 tsdown preset 在编译期注入样式；树外构建拿不到这一步。设置卡的行距与文字层级用内联 style，控件本身用模块表里的官方 `Switch` / `Input`（它们的 hover / focus 皮肤由 ui-primitives 自己的 CSS Modules 带进来）；余额条与面板由插件自己的一枚 `<style>`（`surfaceStylesheet`）承载——内联 style 表达不了 `:hover` 与 `[aria-expanded]`，而那正是它作为按钮需要的状态。代价是这几条声明是从官方 pill 与官方对话框的 CSS 手工抄来的，官方改版就得手工同步。
 - **`faint` 色是超出 Nord 十六色的一个中性台阶**（`#7B88A1`）。官方色阶从 nord3 `#4C566A` 直接跳到 nord4 `#D8DEE9`，中间没有可用于深色背景上 caption/dimmed 文字的台阶；不用它这几处会不可读。
 - **`baseURL` 只在设置里改**，不改 `llm-deepseek` 的配置。参考插件会去读 `llm-deepseek` 段的 `baseURL`；那需要窥探另一个命名空间。
-- **余额接口的可用性取决于上游。** DeepSeek 的 `/user/balance` 不是文档化的稳定契约；字段名变化时 `src/index.ts` 的 `BalanceInfo` 需要同步。
+- **余额接口的可用性取决于上游。** DeepSeek 的 `/user/balance` 不是文档化的稳定契约；字段名变化时 `src/balance.ts` 的 `BalanceInfo` 与 `parseBalance()` 需要同步。
+- **刷新间隔与 API 地址在失焦时才落盘。** 输入过程中不写库，所以敲完值直接用 Escape 关掉设置面板会丢掉这次编辑；点一下别处或 `Tab` 走焦点才会提交。字段是 `defaultValue` + `key` 的非受控写法，React 会在存储值变化时按 `key` 重挂载输入框，代价是重挂载那一刻焦点与光标位置重置——只发生在写入成功后，此时字段本来就没有焦点。

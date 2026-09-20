@@ -1,5 +1,4 @@
-/** Settings namespace, composition defaults, and durable schema for both halves. */
-import z from '@deepseek-ai/schemastery'
+/** Settings namespace, composition defaults, and config type shared by both halves. */
 
 /** Namespace owning this plugin's settings; also the settings-row key. */
 export const NS = 'dsh-nord'
@@ -29,12 +28,3 @@ export const DEFAULTS: Config = {
   refreshSeconds: 60,
   baseURL: 'https://api.deepseek.com',
 }
-
-/** Durable schema; also the wire envelope the browser scope validates against. */
-export const Config: z<Config> = z.object({
-  themeEnabled: z.boolean().default(DEFAULTS.themeEnabled),
-  fontEnabled: z.boolean().default(DEFAULTS.fontEnabled),
-  balanceEnabled: z.boolean().default(DEFAULTS.balanceEnabled),
-  refreshSeconds: z.number().step(1).min(15).max(3600).default(DEFAULTS.refreshSeconds),
-  baseURL: z.string().default(DEFAULTS.baseURL),
-})

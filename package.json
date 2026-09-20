@@ -46,6 +46,8 @@
     "build": "tsdown",
     "dev": "tsdown --watch",
     "prepare": "npm run build",
+    "pretest": "npm run build",
+    "test": "node --test tests/",
     "typecheck": "tsc -p tsconfig.json",
     "prepublishOnly": "npm run typecheck && npm run build"
   },
