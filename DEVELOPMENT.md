@@ -11,7 +11,7 @@ src/balance.ts             Host ↔ 浏览器之间的余额载荷类型
 src/client/index.ts        浏览器半边：主题层、字体、样式表、设置卡、余额轮询、两个 slot 注册
 src/client/nord.ts         Nord 调色板（116 token）、字体栈、余额表面的 CSS
 src/client/BalanceBar.tsx  余额读数与其明细面板
-src/client/NordCard.tsx    设置行
+src/client/NordCard.tsx    设置行的开关与字段
 src/client/stores.ts       设置卡与余额的 slot store
 src/client/locales.ts      `dshNord` 命名空间的中英文案
 tests/balance-mock.mjs     上游 `/user/balance` 的本地替身
@@ -28,6 +28,7 @@ assets/                    README 截图
 | Maple Mono 字体 | 一枚 `<style>` 里的 `:root` 规则 |
 | 余额 | Host 侧 `webServer` 上的 `GET /nord/balance`，用 `ctx.credentials` 解析 `DEEPSEEK_API_KEY`；浏览器侧是 dock 里一枚可点击读数 + 明细面板 |
 | 设置项 | Host `ctx.settings.installSection()` + 浏览器侧 `settings.general.item` 行，持久化进 `settings.yaml` |
+| 设置卡控件 | 模块表基线里的 `@deepseek-ai/dsh-client-ui-primitives`：布尔项用 `Switch`、字段用 `Input`，行距与配色走内联 style |
 | 余额表面的样式 | 插件自己的一枚 `<style>`（`surfaceStylesheet`）：dock 行规则、读数皮肤、面板皮肤 |
 
 ### 为什么配色走 `overrideTokens` 而不是「注册一个主题」
@@ -41,6 +42,12 @@ assets/                    README 截图
 - **81 个 `--dsw-alias-*`** —— 官方 alias 层的完整覆盖，不靠 `!important`、不靠 DOM 手术。
 - **10 个 `--dsw-specific-*`** —— 侧边栏、composer、选择器这些具名表面。
 - **25 个 `--dsw-static-*`** —— 补丁。有一批组件（计划卡、交付物、指南正文、文件类型图标、加载渐变）绕过 alias 直接读静态色阶，官方 light 把这些取成近白，在 Nord 画布上就是一个个白框。这是「浅色露白框」的真正成因，只覆盖 alias 治不了。
+
+### 设置卡为什么能用官方控件
+
+`@deepseek-ai/dsh-client-ui-primitives` 是 Web shell 预置进模块表的基线模块（`packages/client/web/src/platform.ts` 的 `PLATFORM_MODULES`），所以树外插件的 `require` 拿到的就是官方设置行用的那个模块实例，而不是打包进来的第二份：`Switch` 的胶囊皮肤、焦点环、禁用态与 `Input` 的聚焦边框都不必自己写，也不必担心 React 上下文重复。
+
+设置卡其余部分（行距、标签与说明文字的层级、字段宽度）仍是内联 style —— 树外构建没有 CSS Modules 管线，而这些声明也不需要 `:hover` / `:focus` 状态。布尔项从原生 checkbox 换成 `Switch` 也是同一个理由：勾选框在不同浏览器与配色模式下样式不可控，开关的外观则由设计系统持有。
 
 ### 为什么字体是一枚 `:root` 规则
 
@@ -141,7 +148,8 @@ DEEPSEEK_API_KEY=test-key dsh --profile web
 - Host 路由：`GET /nord/balance` 在浏览器会话栅栏后返回 200；无凭据 `{"error":"credentials-missing"}`；接 mock 后返回 `{"currency":"CNY","total":"42.50","granted":"2.50","toppedUp":"40.00","available":true,…}`。
 - 排版（隔离实例 + headless Edge 打开真实页面）：出口节点内联样式仍是 `display: contents`、计算值变成 `flex`；出口的两个子节点是官方 pill 行（`1 轮 1 步`，top 870、高 26、`padding-top` 4）与余额条（top 874、高 22、`margin-top: 4px`、`padding: 1px 8px`、`border-radius: 24px`、图标 16×16），后者计算字号 13px、字体 Maple Mono、行高 20px，两行文字同起于 875。
 - 面板：`role="dialog"`、300×159、位于读数上方 `874 − 8 − 159 = 707`、左边缘与读数对齐，圆角 12、内边距 16、字号 12/18、背景即 Nord `nord4`；四行明细取值正确；Escape 关闭；等过一个刷新周期后面板仍开着、数值不变而更新时间前进。
-- 观感：`assets/` 里的三张截图就是在这套隔离实例里拍的（拍在 `0.1.5-rc.1` 上；rc.2 的排版实测与上面一致）。
+- 设置卡（同一套隔离实例）：`通用` 段里只有这三个 `role="switch"` 控件，尺寸 36×20，右边缘与所在行右边缘齐平；每行标签下是 12/18 的说明文字；两个 `Input` 实宽 98 与 262；点「底部余额条」后 `aria-checked` 转 `false` 且 `settings.yaml` 落盘 `dsh-nord: balanceEnabled: false`，再点回 `true` 同样落盘。
+- 观感：`assets/` 里的三张截图就是在这套隔离实例里拍的（`01` / `03` 拍在 `0.1.5-rc.1`；`02` 设置卡在 `0.1.5-rc.2` 上重拍，rc.2 的排版实测与上面一致）。
 
 ## 发布到 npm
 
@@ -179,7 +187,7 @@ dsh --profile tarball                                 # 起来看一眼
 
 ## 已知限制
 
-- **没有样式管线。** 仓库内插件用 CSS Modules + 共享 `--dsw-*` token，由仓库的 tsdown preset 在编译期注入样式；树外构建拿不到这一步。设置卡用内联 style；余额条与面板由插件自己的一枚 `<style>`（`surfaceStylesheet`）承载——内联 style 表达不了 `:hover` 与 `[aria-expanded]`，而那正是它作为按钮需要的状态。代价是这几条声明是从官方 pill 与官方对话框的 CSS 手工抄来的，官方改版就得手工同步。
+- **没有样式管线。** 仓库内插件用 CSS Modules + 共享 `--dsw-*` token，由仓库的 tsdown preset 在编译期注入样式；树外构建拿不到这一步。设置卡的行距与文字层级用内联 style，控件本身用模块表里的官方 `Switch` / `Input`（它们的 hover / focus 皮肤由 ui-primitives 自己的 CSS Modules 带进来）；余额条与面板由插件自己的一枚 `<style>`（`surfaceStylesheet`）承载——内联 style 表达不了 `:hover` 与 `[aria-expanded]`，而那正是它作为按钮需要的状态。代价是这几条声明是从官方 pill 与官方对话框的 CSS 手工抄来的，官方改版就得手工同步。
 - **`faint` 色是超出 Nord 十六色的一个中性台阶**（`#7B88A1`）。官方色阶从 nord3 `#4C566A` 直接跳到 nord4 `#D8DEE9`，中间没有可用于深色背景上 caption/dimmed 文字的台阶；不用它这几处会不可读。
 - **`baseURL` 只在设置里改**，不改 `llm-deepseek` 的配置。参考插件会去读 `llm-deepseek` 段的 `baseURL`；那需要窥探另一个命名空间。
 - **余额接口的可用性取决于上游。** DeepSeek 的 `/user/balance` 不是文档化的稳定契约；字段名变化时 `src/index.ts` 的 `BalanceInfo` 需要同步。
