@@ -47,6 +47,9 @@ export const FONT_STYLE_ID = 'dsh-nord-fonts'
 /** `<style>` element id carrying the balance surfaces' rules. */
 export const SURFACE_STYLE_ID = 'dsh-nord-surfaces'
 
+/** `<style>` element id carrying the wide-table scroll patch. */
+export const TABLE_STYLE_ID = 'dsh-nord-tables'
+
 /** Attribute marking the balance readout: dock-row member and pill skin. */
 export const BAR_ATTR = 'data-dsh-nord-bar'
 
@@ -232,6 +235,21 @@ export function nordTokens(): ThemeTokenOverrides {
  */
 export function fontStylesheet(): string {
   return `:root{--dsw-font-family:${UI_FONT_STACK};--ds-font-family-code:${CODE_FONT_STACK};}`
+}
+
+/**
+ * Pins the wide markdown table wrapper (the renderer's `md-table-wide` hook) to
+ * an ordinary auto-scrolling box.
+ *
+ * `ui-primitives` keeps the horizontal bar hidden at rest and swaps it in on
+ * hover while reserving its height with `padding-bottom`, which moves the
+ * wrapper out from under the pointer that triggered the swap. Pinning the
+ * reserve only trades that collapse for an 8px hover jump, so the state is
+ * pinned instead; DEVELOPMENT.md records the measurements.
+ * @returns stylesheet text for one `<style>` element.
+ */
+export function tableStylesheet(): string {
+  return '.md-table-wide{overflow-x:auto!important;padding-bottom:0!important;}'
 }
 
 /**

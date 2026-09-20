@@ -15,7 +15,7 @@ import { isBalanceFailure, type BalanceFailure, type BalancePayload } from '../b
 import { BALANCE_PATH, DEFAULTS, NS, type Config } from '../config.ts'
 import { BalanceBar } from './BalanceBar.tsx'
 import { en, LOCALE_NS, zh } from './locales.ts'
-import { FONT_STYLE_ID, fontStylesheet, nordTokens, SURFACE_STYLE_ID, surfaceStylesheet, TOKEN_SOURCE } from './nord.ts'
+import { FONT_STYLE_ID, fontStylesheet, nordTokens, SURFACE_STYLE_ID, surfaceStylesheet, TABLE_STYLE_ID, tableStylesheet, TOKEN_SOURCE } from './nord.ts'
 import { NordCard } from './NordCard.tsx'
 import { createNordBalanceStore, createNordSettingsStore } from './stores.ts'
 
@@ -71,6 +71,17 @@ export function apply(ctx: ClientContext): void {
     document.head.append(element)
     return () => { element.remove() }
   }, 'dsh-nord: balance surfaces')
+
+  // A third `<style>` restores ordinary scrolling on wide markdown tables:
+  // upstream's hover-triggered reserve moves the wrapper out from under the
+  // pointer. See `tableStylesheet`.
+  ctx.effect(() => {
+    const element = document.createElement('style')
+    element.id = TABLE_STYLE_ID
+    element.textContent = tableStylesheet()
+    document.head.append(element)
+    return () => { element.remove() }
+  }, 'dsh-nord: wide-table scroll patch')
 
   // The colour layer, folded over whichever base palette is active.
   ctx.effect(() => {

@@ -10,7 +10,7 @@ src/config.ts              两侧共用的配置类型、默认值与 NS / BALAN
 src/schema.ts              Host 独有的 durable schema，唯一 import schemastery 的模块
 src/balance.ts             余额载荷类型，以及上游文档到载荷的投影
 src/client/index.ts        浏览器半边：主题层、字体、样式表、设置卡、余额轮询、两个 slot 注册
-src/client/nord.ts         Nord 调色板（116 token）、字体栈、余额表面的 CSS
+src/client/nord.ts         Nord 调色板（116 token）、字体栈、余额表面与宽表格补丁的 CSS
 src/client/BalanceBar.tsx  余额读数与其明细面板
 src/client/NordCard.tsx    设置行的开关与字段
 src/client/stores.ts       设置卡与余额的 slot store
@@ -33,6 +33,7 @@ assets/                    README 截图
 | 设置项 | Host `ctx.settings.installSection()` + 浏览器侧 `settings.general.item` 行，持久化进 `settings.yaml` |
 | 设置卡控件 | 模块表基线里的 `@deepseek-ai/dsh-client-ui-primitives`：布尔项用 `Switch`、字段用 `Input`，行距与配色走内联 style |
 | 余额表面的样式 | 插件自己的一枚 `<style>`（`surfaceStylesheet`）：dock 行规则、读数皮肤、面板皮肤 |
+| 宽表格抖动补丁 | 第三枚 `<style>`（`tableStylesheet`）：把 `md-table-wide` 钉在 `overflow-x:auto` 且无底部预留，取消上游的悬停切换 |
 
 ### 为什么配色走 `overrideTokens` 而不是「注册一个主题」
 
@@ -59,6 +60,22 @@ assets/                    README 截图
 一枚由插件持有、卸载即移除的 `<style>`，用 `:root` 选择器赢得与上游 `:root` 的层叠，全部派生族自动跟随——不用枚举 50 多个变量。
 
 代码字体栈按 `base.css` 自己的记录不带裸 `monospace` 尾巴：Windows CJK 会经它回退到 SimSun。
+
+### 宽表格为什么被钉在 `auto`
+
+上游 `ui-primitives` 给 markdown 宽表格（渲染器的 `md-table-wide` 钩子）做了「静止藏条、悬停显条」，藏的时候用 `padding-bottom: var(--dsh-scrollbar-width, 8px)` 把条的高度先占住：
+
+```css
+.tableScroll:global(.md-table-wide) { overflow-x: hidden; padding-bottom: var(--dsh-scrollbar-width, 8px); }
+.tableScroll:global(.md-table-wide):hover,
+.tableScroll:global(.md-table-wide):focus-visible { overflow-x: auto; padding-bottom: 0; }
+```
+
+这套交换会改盒子本身，于是触发它的指针可能被自己造成的状态甩出去：在底边那 8px 里，`padding-bottom` 归零使盒子缩短 8px，指针落到盒外，`:hover` 丢失，预留回来，两个状态来回切——就是鼠标停在表格底边时的抖动。0.1.5-rc.2 的悬停态是 `overflow-x: auto`，只有真的放不下才出条，所以「四列但放得下」的宽表格（`md-table-wide` 由列数决定，与是否溢出无关）归零后没有条接手，任何滚动条路径都会缩。
+
+把预留固定成 8px 不能解决，反而换个方向错：占位的滚动条排在 padding 盒之外，所以固定 8px 预留叠上 8px 的条，会让悬停时的盒子比静止时高 8px，把表格下方的内容整体推下去。钉住**状态**才行 —— `auto` 且不留预留，盒子的边框盒在两种状态、两条滚动条路径上完全一致（Chromium 实测：叠加式滚动条下两种表格都是 69px；8px 自绘条下，放得下的表格 69px、溢出的表格 77px —— 都是静止与悬停同值），指针永远不会落到盒外，放得下的宽表格也照样没有条。代价是溢出的宽表格要常驻一条普通横向滚动条。
+
+补丁只有一条规则，用 `!important` 一次性压掉上游的静止与悬停两条声明；它只碰 `overflow-x` 与 `padding-bottom`，不动 `ui-chat` 借同一个钩子做的加宽与对齐（`width` / `margin-left` / `padding-left`）。
 
 ### 余额条为什么还需要一条 dock 规则
 
@@ -112,11 +129,12 @@ Host 半边把 `@deepseek-ai/dsh-brand`、`dsh-credentials`、`schemastery` 等�
 
 ## 版本现实
 
-本插件对齐 **`0.1.5-rc.2`**；`devDependencies` 全部钉死在这个版本上，发布的包也只在这个版本上验证过（`0.1.5-rc.1` 同样验证过，两者对本插件用到的接口无差异）。开发期间确认了三处版本漂移：
+本插件对齐 **`0.1.5-rc.2`**；`devDependencies` 全部钉死在这个版本上，发布的包也只在这个版本上验证过（`0.1.5-rc.1` 同样验证过，两者对本插件用到的接口无差异）。开发期间确认了四处版本漂移：
 
 1. **`@deepseek-ai/dsh-client-ui-plugin-manager` 只发布了 `0.1.6-alpha.2`。** 那个「插件配置」通用卡片槽位（`plugins.item` / 文档里的 `settings.plugin.item`）是 0.1.6 才有的。0.1.5 时代的 `ui-settings-plugin-inventory` 只是只读的插件清单页，没有给第三方插件的配置槽位。所以设置卡挂在 0.1.5 就存在、且文档明确写着「一个设置项就够、不需要独立页面的功能插件贡献」的 `settings.general.item` 上——官方外观行与字号行用的是同一个槽。
 2. **`@deepseek-ai/schemastery` 不用 dsh 的版本号**，它是 `3.18.2`；`@deepseek-ai/cordis` 独立版本化，是 `4.0.2`。
 3. **`conversation.composer.dock` 在 0.1.5 是竖列、0.1.6 才是横排**，余额条与官方 pill 同行靠插件自己的一条规则补上（0.1.5-rc.2 仍是竖列）。
+4. **宽表格补丁绑在上游的悬停切换上。** 0.1.5-rc.2 的悬停态是 `overflow-x: auto`，仓库里的源码已经改成 `overflow-x: scroll`（放得下的表格也常驻条位，于是自绘滚动条路径不再缩，但叠加式滚动条路径照旧）。这两处只要有一处变动——修改 `md-table-wide` 钩子，或上游自己取消悬停切换、让盒子在两种状态下恒定——`tableStylesheet` 就要重新评估是删掉还是改写。
 
 升级 dsh 时这几条都可能变化：改依赖版本、重新 `npm run build`、按需重发一版。改完至少跑一遍 `npm run typecheck`（接口漂移会在类型上暴露）与下面「本地验证」里的一次浏览器实测。
 
@@ -151,7 +169,7 @@ DEEPSEEK_API_KEY=test-key dsh --profile web
 
 已经验证过的内容：
 
-- `npm run typecheck`、`npm run build` 通过；`lib/client.js` 只把模块表里的五个 specifier 留作 external，其余内联，banner/intro/footer 符合 `__ModuleLoader__.load({ id: "dsh-nord", … })` 契约并导出 `apply` / `inject`；产物 40.71 kB（拆出 `src/schema.ts` 之前是 70.66 kB，差的正是内联进来的 schemastery 与 cosmokit）。
+- `npm run typecheck`、`npm run build` 通过；`lib/client.js` 只把模块表里的五个 specifier 留作 external，其余内联，banner/intro/footer 符合 `__ModuleLoader__.load({ id: "dsh-nord", … })` 契约并导出 `apply` / `inject`；产物 42.26 kB（gzip 11.68 kB；拆出 `src/schema.ts` 之前是 70.66 kB，差的正是内联进来的 schemastery 与 cosmokit）。
 - `npm test` 通过：`tests/balance.test.mjs` 的 8 条规格跑在构建产物 `lib/balance.js` 上，覆盖正常字段、多币种取首条、`is_available` 缺失或为 `false`、条目字段缺失回退、数值型余额、非字符串 `currency`，以及 `balance_infos` 缺失 / 空数组 / 非数组 / 首项非对象都归到 `malformed-response`。
 - 调色板：直接求值 `nordTokens()` 得 116 项（81 alias + 10 specific + 25 static），`--dsw-alias-bg-base` = `{light:#ECEFF4, dark:#2E3440}`。
 - 安装：`dsh plugin add` 后 `dsh.profile.bundles` 追加成功，`--dump-config` 出现 `# == dsh-nord` 层；tarball 安装路径同样验证过（见下节彩排）。
@@ -166,6 +184,7 @@ DEEPSEEK_API_KEY=test-key dsh --profile web
 - 余额开关联动：关掉「底部余额条」后读数从 dock 消失，同一张卡里的刷新间隔与 API 地址两个字段同时进入禁用态；打开后恢复可编辑。
 - 面板「更新时间」走字典模板：中文界面实测 `2026年9月20日 22:29`（模板 `{y}年{m}月{d}日 {time}`，英文为 `{y}-{m}-{d} {time}`）；改用 `toLocaleString()` 时同一台机器上显示的是浏览器语言的 `2026/9/20 22:19:36`，界面切到英文也不会跟着变。
 - 观感：`assets/` 里的三张截图就是在这套隔离实例里拍的（`01` / `03` 拍在 `0.1.5-rc.1`；`02` 设置卡在 `0.1.5-rc.2` 上重拍，rc.2 的排版实测与上面一致）。
+- 宽表格补丁（headless Edge + Playwright，按 `0.1.5-rc.2` 的原样 CSS 复现，四列「放得下」与十二列「溢出」各一份，`--hide-scrollbars` 与默认自绘条两种路径）：上游现状下「放得下」的表格在两条路径上都从 77px 缩到 69px（盒底上移，指针被甩出），叠加式滚动条路径下溢出的表格同样 77 → 69。固定 8px 预留的写法在自绘条路径下让溢出的表格 77 → 85（下方内容下移 8px）。本补丁的写法在四个组合里都是静止与悬停同值（叠加式滚动条下两种表格都 69px；8px 自绘条下，放得下的 69px、溢出的 77px），表格下方内容位置不动。
 
 ## 发布到 npm
 
