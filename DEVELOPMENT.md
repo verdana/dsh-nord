@@ -70,7 +70,7 @@ div[data-slot="conversation.composer.dock"]:has(> [data-dsh-nord-bar]) {
 
 条本身只跟官方 pill（`StatsPills.module.css` 的 `.pill`）对齐文字档：`flex: none`、`gap: 6px`、`font-family: inherit`、`font-size: var(--dsh-content-font-size-secondary, 13px)`、`line-height: calc(20px + var(--dsh-content-font-delta-secondary, 0px))`、`font-variant-numeric: tabular-nums`、`white-space: nowrap`。字号走变量而非写死 13px，才能跟随设置里的正文字号联动派生。
 
-盒子本身故意不是 pill：`padding: 4px 0 0 0`，没有左右内边距——行内的 12px `gap` 负责间距。官方 pill 行的 `.root` 自带 4px 顶部内边距、`.pill` 再叠 1px，两行文字因此都从行顶 +5px 起排，视觉基线一致。图标是插件自带的 16×16 描边字形（`currentColor`，按 16×16 渲染）。
+盒子保留胶囊外观（`padding: 1px 8px`、`border-radius: 24px`），用 `margin-top: 4px` 把文字压到与官方 pill 同一条基线：官方 pill 行的 `.root` 自带 4px 顶部内边距、`.pill` 再叠 1px，两行文字因此都从行顶 +5px 起排。图标是插件自带的 16×16 描边字形（`currentColor`，按 16×16 渲染）。
 
 ### 余额明细面板
 
@@ -96,13 +96,13 @@ Host 半边把 `@deepseek-ai/dsh-brand`、`dsh-credentials`、`schemastery` 等�
 
 ## 版本现实
 
-本插件对齐 **`0.1.5-rc.1`**；`devDependencies` 全部钉死在这个版本上，发布的包也只在这个版本上验证过。开发期间确认了三处版本漂移：
+本插件对齐 **`0.1.5-rc.2`**；`devDependencies` 全部钉死在这个版本上，发布的包也只在这个版本上验证过（`0.1.5-rc.1` 同样验证过，两者对本插件用到的接口无差异）。开发期间确认了三处版本漂移：
 
 1. **`@deepseek-ai/dsh-client-ui-plugin-manager` 只发布了 `0.1.6-alpha.2`。** 那个「插件配置」通用卡片槽位（`plugins.item` / 文档里的 `settings.plugin.item`）是 0.1.6 才有的。0.1.5 时代的 `ui-settings-plugin-inventory` 只是只读的插件清单页，没有给第三方插件的配置槽位。所以设置卡挂在 0.1.5 就存在、且文档明确写着「一个设置项就够、不需要独立页面的功能插件贡献」的 `settings.general.item` 上——官方外观行与字号行用的是同一个槽。
-2. **`@deepseek-ai/schemastery` 不用 dsh 的版本号**，它是 `3.18.2`。
-3. **`conversation.composer.dock` 在 0.1.5 是竖列、0.1.6 才是横排**，余额条与官方 pill 同行靠插件自己的一条规则补上。
+2. **`@deepseek-ai/schemastery` 不用 dsh 的版本号**，它是 `3.18.2`；`@deepseek-ai/cordis` 独立版本化，是 `4.0.2`。
+3. **`conversation.composer.dock` 在 0.1.5 是竖列、0.1.6 才是横排**，余额条与官方 pill 同行靠插件自己的一条规则补上（0.1.5-rc.2 仍是竖列）。
 
-升级 dsh 时这几条都可能变化：改依赖版本、重新 `npm run build`、按需重发一版。
+升级 dsh 时这几条都可能变化：改依赖版本、重新 `npm run build`、按需重发一版。改完至少跑一遍 `npm run typecheck`（接口漂移会在类型上暴露）与下面「本地验证」里的一次浏览器实测。
 
 ## 开发循环
 
@@ -139,9 +139,9 @@ DEEPSEEK_API_KEY=test-key dsh --profile web
 - 安装：`dsh plugin add` 后 `dsh.profile.bundles` 追加成功，`--dump-config` 出现 `# == dsh-nord` 层；tarball 安装路径同样验证过（见下节彩排）。
 - 启动：shell 的预载列表含 `dsh-nord/client.js`，combo 路由内容含本包注册与 `dsh-nord-surfaces` 样式表。
 - Host 路由：`GET /nord/balance` 在浏览器会话栅栏后返回 200；无凭据 `{"error":"credentials-missing"}`；接 mock 后返回 `{"currency":"CNY","total":"42.50","granted":"2.50","toppedUp":"40.00","available":true,…}`。
-- 排版（隔离实例 + headless Edge 打开真实页面）：出口节点内联样式仍是 `display: contents`、计算值变成 `flex`；出口的两个子节点是官方 pill 行（`1 轮 1 步`，top 870、高 26、`padding-top` 4）与余额条（top 871、高 24、`padding: 4px 0 0 0`、图标 16×16），后者计算字号 13px、字体 Maple Mono、行高 20px，两行文字同起于 875。
-- 面板：`role="dialog"`、300×159、位于读数上方 `871 − 8 − 159 = 704`、左边缘与读数对齐，圆角 12、内边距 16、字号 12/18、背景即 Nord `nord4`；Escape 关闭；等过一个刷新周期后面板仍开着、数值不变而更新时间前进。
-- 观感：`assets/` 里的三张截图就是在这套隔离实例里拍的。
+- 排版（隔离实例 + headless Edge 打开真实页面）：出口节点内联样式仍是 `display: contents`、计算值变成 `flex`；出口的两个子节点是官方 pill 行（`1 轮 1 步`，top 870、高 26、`padding-top` 4）与余额条（top 874、高 22、`margin-top: 4px`、`padding: 1px 8px`、`border-radius: 24px`、图标 16×16），后者计算字号 13px、字体 Maple Mono、行高 20px，两行文字同起于 875。
+- 面板：`role="dialog"`、300×159、位于读数上方 `874 − 8 − 159 = 707`、左边缘与读数对齐，圆角 12、内边距 16、字号 12/18、背景即 Nord `nord4`；四行明细取值正确；Escape 关闭；等过一个刷新周期后面板仍开着、数值不变而更新时间前进。
+- 观感：`assets/` 里的三张截图就是在这套隔离实例里拍的（拍在 `0.1.5-rc.1` 上；rc.2 的排版实测与上面一致）。
 
 ## 发布到 npm
 

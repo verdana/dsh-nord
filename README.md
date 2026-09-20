@@ -18,7 +18,7 @@
 
 ## 环境要求
 
-- dsh **`0.1.5-rc.1`** —— 开发与验证所用的版本。其他版本见 [DEVELOPMENT.md](DEVELOPMENT.md#版本现实)。
+- dsh **`0.1.5-rc.2`** —— 开发与验证所用的版本（`0.1.5-rc.1` 同样验证过）。其他版本见 [DEVELOPMENT.md](DEVELOPMENT.md#版本现实)。
 - 余额读数需要 `DEEPSEEK_API_KEY`（由 dsh 的 credentials 服务解析）。没有凭据时余额条显示错误文案，主题、字体、设置不受影响。
 
 ## 安装
