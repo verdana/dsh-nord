@@ -17,6 +17,8 @@ src/client/stores.ts       设置卡与余额的 slot store
 src/client/locales.ts      `dshNord` 命名空间的中英文案
 tests/balance.test.mjs     投影的 `node --test` 规格
 tests/balance-mock.mjs     上游 `/user/balance` 的本地替身
+scripts/release-lab.mjs    隔离 `$DSH_HOME`，逐个验证四种安装方式（见「发布后的四种安装方式」）
+scripts/publish-npm.mjs    发布流水线：六道闸门 + tarball 核查 + 真发布（见「发布到 npm」）
 assets/                    README 截图
 ```
 
@@ -188,37 +190,102 @@ DEEPSEEK_API_KEY=test-key dsh --profile web
 
 ## 发布到 npm
 
-包已是可发布形态（`license` / `files` / `prepublishOnly` 齐备）。发布前有三处要改：
-
-1. `LICENSE` 里的版权人（当前写的是 `dsh-nord contributors`）。
-2. `package.json` 里加上 `repository`（`{"type":"git","url":"git+https://github.com/<you>/dsh-nord.git"}`）——npm 页面靠它把 README 里的相对图片路径指到仓库；不加的话包页上的截图是裂的。
-3. 版本号（首次发布 `0.1.0` 即可）。
+一行 `npm publish` 在这个仓库里不够用：本机 `~/.npmrc` 的 registry 指向只读的腾讯镜像，而发布前有几项事实必须核查（工作树、元数据、tarball 内容、registry 上的版本与维护者）。`scripts/publish-npm.mjs` 把这些串成一条带闸门的流水线，**默认只核查不发布**：
 
 ```sh
-npm login   --registry https://registry.npmjs.org/
-npm publish --registry https://registry.npmjs.org/
+npm run release:check              # = node scripts/publish-npm.mjs：跑完六道闸门，打 tarball，不发布
+npm run release                    # = ... --publish：真发布（必须再给 --yes）
 ```
-
-两个本机前提：
-
-- 本机 `~/.npmrc` 的 registry 指向 `mirrors.cloud.tencent.com`；镜像是只读的，所以 **`npm login` 与 `npm publish` 都要显式给 `--registry https://registry.npmjs.org/`**（`npm login` 不带这个参数会去登录镜像）。
-- 无 scope 的包名默认 public；`--access public` 只在改成带 scope 的名字（如 `@you/dsh-nord`）时才需要。
-
-发布前彩排（不需要 npm 账号）：
 
 ```sh
-npm pack                                              # 产出 dsh-nord-0.1.0.tgz
-dsh --profile tarball --from-default-profile web      # 建一个干净 profile
-dsh plugin --profile tarball add ./dsh-nord-0.1.0.tgz
-dsh --profile tarball --dump-config                   # 应出现 "# == dsh-nord"
-dsh --profile tarball                                 # 起来看一眼
+# 首次发布前，先把两处会被闸门挡住的东西改掉（脚本会直接给出这两条命令）
+node scripts/publish-npm.mjs --set-license "Verdana" --create-repo-field
+
+# 查一遍（不需要 npm 账号）
+npm run release:check
+
+# 登录 + 发布 + 打 git tag + 发布后从 registry 冒烟装一遍
+npm login --registry https://registry.npmjs.org/
+node scripts/publish-npm.mjs --bump patch --publish --yes --smoke
 ```
 
-卸载：`dsh plugin --profile tarball remove dsh-nord`。
+六道闸门，任一不过就停：
 
-发新版本：改 `version` → 重新 `npm publish` → 用户侧 `dsh plugin --profile web update dsh-nord`（`dsh plugin` 把参数转发给 pnpm）。
+| # | 闸门 | 不过时的含义 |
+|---|---|---|
+| 1 | 工作树干净、在 main/master 上 | 发出去的东西对不上任何提交（`--allow-dirty` / `--allow-branch` 可放行，不推荐） |
+| 2 | `name` / `version` / `license` / `files` / `dsh` 段齐全，LICENSE 版权人不是占位符，`repository` 在 | 包页截图裂掉、dsh 认不出这是插件包、版权人写着「contributors」 |
+| 3 | `typecheck` + `test` + `build` 全过 | 按 `package.json` 里的 script 跑，输出直接透传 |
+| 4 | tarball 恰好是那 8 个文件 | 少了产物（`files` 写漏）或混进 `src/`、`tests/` |
+| 5 | registry 上没有这个版本、包名维护者包含当前登录身份 | 同版本重发会被 npm 拒（`--bump patch` 解决）、发到别人的包上会 403 |
+| 6 | `npm publish` | 默认跳过；`--publish --yes` 才走 |
 
-发布包只含 `lib/`、`cordis.patch.yml`、`README.md`、`LICENSE`、`package.json`；`src/`、`tests/`、`assets/` 不进包。
+几个设计点：
+
+- **默认不发布。** 不带 `--publish` 时最后会告诉你确切的发布命令；带了 `--publish` 还要 `--yes` 再确认一次。
+- **`--bump` 只改 `package.json`**（`npm version --no-git-tag-version`），git commit 与 `v<版本>` tag 放在**发布成功之后**打——发布失败不该在仓库里留一个悬空的版本提交。
+- **`--set-license` / `--create-repo-field` 是幂等的**，只做那一处替换；`repository` 从 `git remote.origin.url` 推 owner/repo。
+- **凭据只在真要发布那一步碰**：`NPM_TOKEN` 环境变量会被写成仓库级 `.npmrc`，发布结束立刻删掉；核查阶段永远不写。
+- 发布后 `--smoke` 会直接调用 `release-lab.mjs npm --registry <registry>`，从 registry 真装一遍；刚推上去可能有一两分钟传播延迟，失败不代表包有问题。
+
+本机前提（脚本会检查并在缺的时候给出确切命令）：
+
+- **`npm login --registry https://registry.npmjs.org/`** —— 本机 `~/.npmrc` 的 registry 指向 `mirrors.cloud.tencent.com`，镜像是只读的；`npm login` 与 `npm publish` 都必须显式带 `--registry`，否则 login 会去登录镜像、publish 会往镜像推。
+- 无 scope 的包名默认 public；`--access public` 只在改成带 scope 的名字（如 `@you/dsh-nord`）时才需要，脚本会按包名自动加。
+- `~/.npmrc` 里的 `proxy` / `https-proxy` / `strict-ssl=false` 脚本原样继承，不覆盖。
+
+发布前彩排（不需要 npm 账号，也不碰网络）：
+
+```sh
+npm run release:check                                 # 六道闸门 + tarball 内容清单
+node scripts/release-lab.mjs link tarball             # 用隔离 home 把这两条装法过一遍
+```
+
+发新版本：`node scripts/publish-npm.mjs --bump patch --publish --yes` → 用户侧 `dsh plugin --profile web update dsh-nord`（`dsh plugin` 把参数转发给 pnpm）。
+
+发布包只含 `lib/`、`cordis.patch.yml`、`README.md`、`LICENSE`、`package.json`（8 个文件：`lib/` 下 4 个含 `client.js.map`）；`src/`、`tests/`、`scripts/`、`assets/`、`tsdown.config.ts`、`tsconfig.json` 都不进包，第 4 道闸门会核对这份清单。
+
+## 发布后的四种安装方式，一次跑完
+
+用户能走的装法有四条，各自的坑不同；一条条在真实 profile 上 `dsh plugin add/remove` 验证又慢又脏（每次都改你自己的 profile、装一遍又卸一遍）。`scripts/release-lab.mjs` 把这件事收敛成一条命令：
+
+```sh
+node scripts/release-lab.mjs                      # 四种方式全跑（git 首次约 1–2 分钟）
+node scripts/release-lab.mjs link tarball         # 只跑给本地用的两条，完全不碰网络
+node scripts/release-lab.mjs npm --registry https://registry.npmjs.org/
+node scripts/release-lab.mjs --keep --no-boot     # 只查装卸，保留现场
+```
+
+它凭什么干净：`@deepseek-ai/dsh-home-paths` 先看 `$DSH_HOME`，所以脚本把它指到仓库里的 `.release-lab/home`（已 gitignore），每种方式配一个一次性 profile（`lab-link` / `lab-tarball` / `lab-npm` / `lab-git`）。**你的 `~/.dsh` 全程不被触碰，脚本也不提供指向真实 profile 的开关。**
+
+每种方式依次过四道：
+
+| 检查 | 看什么 | 能抓住什么 |
+|---|---|---|
+| install | `dsh plugin --profile lab-<方式> add <spec>` 退出码 | spec 解不开、registry 上没有、git 被 `allowBuilds` 拦下 |
+| layer | `dsh --dump-config` 里有 `# == dsh-nord` | 依赖装上了但没进 `dsh.profile.bundles`（`dsh.bundle.patch` 没被认出来） |
+| resolve | profile 的 `node_modules/dsh-nord` 里 `package.json` + `cordis.patch.yml` + `lib/index.js` + `lib/client.js` 都在且非空 | 装了个空壳、软链指向不存在的路径、`files` 漏了产物 |
+| boot | `dsh --no-open --port 0` 起一次，抓首页 `__DSH_BOOT__` 的 entries | 客户端半边没注册、`dsh.client.inject` 与 `package.json` 声明不一致、`/plugins/??dsh-nord/client.js` 取不到 |
+
+第四道是最有价值的一道，也是手工最容易省掉的一道：`--dump-config` 只看得到 Host 半边，客户端半边是否进了 shell 的预载列表，只有把首页抓下来看 `__DSH_BOOT__` 才知道。首页要用启动时打印的 `?token=` 换一次 cookie 才能访问（直接请求 `/` 是 401），脚本跟这一次 303 并带上 cookie。
+
+各方式实测（本机；npm 那条尚未发布，跑出来是预期的失败）：
+
+| 方式 | profile 里的 spec | 冷启动耗时 | 备注 |
+|---|---|---|---|
+| link | `link:D:/deepseek-harness/dsh-nord` | ~1s | 软链指回工作树，改动落盘即生效 |
+| tarball | `file:…/.release-lab/artifacts/dsh-nord-0.1.0.tgz` | ~1s（`npm pack` 另计） | 走 `prepare` 重新构建，装的是包内真实文件 |
+| npm | `dsh-nord@latest` | 看 registry | 本机 `~/.npmrc` 指向只读镜像，必须 `--registry https://registry.npmjs.org/`；未发布时在 `npm view` 处直接失败 |
+| git | `github:verdana/dsh-nord` | 首次 ~40s（clone + 装 91 个 devDependency + 构建） | 首次必被 `allowBuilds` 拦下 |
+
+git 那条的 `allowBuilds` 是唯一需要人工介入的地方，脚本替你做掉：`dsh plugin` 失败时 pnpm 会把要粘贴的键值打进错误里（形如 `dsh-nord@https://codeload.github.com/<owner>/<repo>/tar.gz/<sha>: true`），脚本把它抓出来插进该 profile 的 `pnpm-workspace.yaml` 再重试一次。注意 pnpm 会按终端宽度折行，这段文本要**删掉所有空白再匹配**，否则抓不全；插入用文本插入而不是 YAML 重写，注释与缩进原样保留，重复调用幂等。
+
+局限说清楚：
+
+- **这里验证的是「装得上、装得对、加载得起来」，不是功能。** 界面、余额、设置项的实测还是 DEVELOPMENT.md 上面「本地验证」那套隔离实例 + headless Edge 的流程。
+- **npm 方式装的是 registry 上的版本，不是当前工作树。** 本地版本与已发布版本不一致时脚本会黄字提示，别把它当成「这次改动已发布」的证据。
+- **git 方式不锁定 commit。** 默认用 `github:<owner>/<repo>`（owner/repo 从 `repository` 字段或 `git remote` 推），要复现某个提交请自己给 `--git github:<owner>/<repo>#<sha>`。
+- 每种方式各占一份 `node_modules`（互不共享），`.release-lab` 会到几百 MB 量级；不加 `--keep` 时跑完自动删。
 
 ## 已知限制
 

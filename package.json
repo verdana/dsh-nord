@@ -4,6 +4,10 @@
   "description": "Nord theme, Maple Mono font stacks, a settings row, and a DeepSeek balance readout with a detail panel for the dsh Web GUI.",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/verdana/dsh-nord.git"
+  },
   "keywords": [
     "dsh",
     "deepseek-harness",
@@ -49,7 +53,10 @@
     "pretest": "npm run build",
     "test": "node --test tests/",
     "typecheck": "tsc -p tsconfig.json",
-    "prepublishOnly": "npm run typecheck && npm run build"
+    "prepublishOnly": "npm run typecheck && npm run build",
+    "release:check": "node scripts/publish-npm.mjs",
+    "release": "node scripts/publish-npm.mjs --publish",
+    "lab": "node scripts/release-lab.mjs"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "4.0.2",

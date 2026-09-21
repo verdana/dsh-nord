@@ -79,6 +79,20 @@ git 安装需要你在 profile 的 `pnpm-workspace.yaml` 里为该包授权构�
 
 见 [DEVELOPMENT.md](DEVELOPMENT.md)：项目结构、机制说明、开发循环、验证记录、发布步骤。
 
+发布后想确认四种安装方式（本地 link / tarball / npm / GitHub）都能装能加载，一条命令跑完，跑在自己的隔离 `$DSH_HOME` 里，不动你的 profile：
+
+```sh
+npm run lab          # = node scripts/release-lab.mjs
+```
+
+发布到 npm 也走脚本（默认只核查不发布）：
+
+```sh
+npm run release:check                                                      # 六道闸门 + tarball 内容清单
+npm login --registry https://registry.npmjs.org/                           # 本机 ~/.npmrc 指向只读镜像，必须显式带 --registry
+node scripts/publish-npm.mjs --bump patch --publish --yes --smoke          # 升版 → 发布 → 打 tag → 从 registry 冒烟装一遍
+```
+
 ## 许可
 
 [MIT](LICENSE)
