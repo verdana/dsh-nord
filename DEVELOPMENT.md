@@ -194,7 +194,14 @@ DEEPSEEK_API_KEY=test-key dsh --profile web
 
 ```sh
 npm run release:check              # = node scripts/publish-npm.mjs：跑完六道闸门，打 tarball，不发布
-npm run release                    # = ... --publish：真发布（必须再给 --yes）
+npm run release                    # = ... --publish：真发布
+```
+
+**经 `npm run` 传参要放在 `--` 之后**，否则 npm 会把参数当成自己的配置项——实测 `npm run release --no-tests` 会被解析成 `--tests` 并报 `npm error`。所以：
+
+```sh
+npm run release -- --smoke                 # 发布 + 从 registry 冒烟装一遍
+npm run release -- --bump patch --smoke    # 升版发布
 ```
 
 ```sh
@@ -206,7 +213,7 @@ npm run release:check
 
 # 登录 + 发布 + 打 git tag + 发布后从 registry 冒烟装一遍（首次发布 0.1.0，不需要 --bump）
 npm login --registry https://registry.npmjs.org/
-node scripts/publish-npm.mjs --publish --yes --smoke
+node scripts/publish-npm.mjs --publish --smoke
 ```
 
 六道闸门，任一不过就停：
@@ -218,11 +225,11 @@ node scripts/publish-npm.mjs --publish --yes --smoke
 | 3 | `typecheck` + `test` + `build` 全过 | 按 `package.json` 里的 script 跑，输出直接透传 |
 | 4 | tarball 恰好是那 8 个文件 | 少了产物（`files` 写漏）或混进 `src/`、`tests/` |
 | 5 | registry 上没有这个版本、包名维护者包含当前登录身份 | 同版本重发会被 npm 拒（`--bump patch` 解决）、发到别人的包上会 403 |
-| 6 | `npm publish` | 默认跳过；`--publish --yes` 才走 |
+| 6 | `npm publish` | 默认跳过；`--publish` 才走 |
 
 几个设计点：
 
-- **默认不发布。** 不带 `--publish` 时最后会告诉你确切的发布命令；带了 `--publish` 还要 `--yes` 再确认一次。
+- **只有一道确认闸门：`--publish`。** 不带它一律只核查，并在结尾打印确切的发布命令；带了它就直接发。早期版本额外要一个 `--yes`，那是多余的第二道确认——不但没增加安全，还会在 `npm run release --yes` 这种写法下静默失效（参数被 npm 吃掉），已经去掉。老命令里残留的 `--yes` 仍被接受，但会提示一句已不需要。
 - **`--bump` 只改 `package.json`**（`npm version --no-git-tag-version`），git commit 与 `v<版本>` tag 放在**发布成功之后**打——发布失败不该在仓库里留一个悬空的版本提交。
 - **`--set-license` / `--create-repo-field` 是幂等的**，只做那一处替换；`repository` 从 `git remote.origin.url` 推 owner/repo。
 - **凭据只在真要发布那一步碰**：`NPM_TOKEN` 环境变量会被写成仓库级 `.npmrc`，发布结束立刻删掉；核查阶段永远不写。
@@ -241,7 +248,7 @@ npm run release:check                                 # 六道闸门 + tarball �
 node scripts/release-lab.mjs link tarball             # 用隔离 home 把这两条装法过一遍
 ```
 
-发新版本：`node scripts/publish-npm.mjs --bump patch --publish --yes` → 用户侧 `dsh plugin --profile web update dsh-nord`（`dsh plugin` 把参数转发给 pnpm）。
+发新版本：`node scripts/publish-npm.mjs --bump patch --publish` → 用户侧 `dsh plugin --profile web update dsh-nord`（`dsh plugin` 把参数转发给 pnpm）。
 
 发布包只含 `lib/`、`cordis.patch.yml`、`README.md`、`LICENSE`、`package.json`（8 个文件：`lib/` 下 4 个含 `client.js.map`）；`src/`、`tests/`、`scripts/`、`assets/`、`tsdown.config.ts`、`tsconfig.json` 都不进包，第 4 道闸门会核对这份清单。
 

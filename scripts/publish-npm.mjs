@@ -24,10 +24,16 @@
  *   node scripts/publish-npm.mjs                     # 完整核查 + 打 tarball，不发布
  *   node scripts/publish-npm.mjs --set-license "张三" --create-repo-field
  *                                                    # 先把发布会挡住的两处元数据改掉
- *   node scripts/publish-npm.mjs --bump patch --publish --yes
+ *   node scripts/publish-npm.mjs --bump patch --publish
  *                                                    # 升版 → 核查 → 真发 → 打 git commit + tag
- *   node scripts/publish-npm.mjs --publish --yes --otp 123456
- *   node scripts/publish-npm.mjs --publish --yes --smoke   # 发完立刻用 release-lab 装一遍
+ *   node scripts/publish-npm.mjs --publish --otp 123456
+ *   node scripts/publish-npm.mjs --publish --smoke   # 发完立刻用 release-lab 装一遍
+ *
+ * 走 npm script 时参数要放在 `--` 之后（npm 会吃掉自己认识的开关，比如 `--no-tests`
+ * 会被解析成 `--tests`）：
+ *   npm run release:check
+ *   npm run release -- --smoke
+ *   npm run release -- --bump patch --smoke
  *
  * CI 里用 NPM_TOKEN 环境变量即可，脚本会临时写一个仓库级 .npmrc 并在结尾删掉。
  */
@@ -67,9 +73,10 @@ function fail(message) {
 
 // ── CLI ──────────────────────────────────────────────────────────────────────
 
+// `--publish` 本身就是显式确认，够不够再叠一个 `--yes`？不了：那会变成一次发布会
+// 撞三道闸门（默认不发布 / --publish / --yes），而且 npm run 下还传不进来。
 const opts = {
   publish: false,
-  yes: false,
   registry: PUBLIC_REGISTRY,
   tag: '',
   otp: '',
@@ -91,7 +98,6 @@ for (let i = 0; i < argv.length; i += 1) {
   const arg = argv[i]
   const value = () => argv[++i] ?? ''
   if (arg === '--publish') opts.publish = true
-  else if (arg === '--yes' || arg === '-y') opts.yes = true
   else if (arg === '--registry') opts.registry = value()
   else if (arg === '--tag') opts.tag = value()
   else if (arg === '--otp') opts.otp = value()
@@ -105,13 +111,13 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg === '--dry-run-pack') opts.dryRunPack = true
   else if (arg === '--smoke') opts.smoke = true
   else if (arg === '--keep-tarball') opts.keepTarball = true
+  else if (arg === '--yes' || arg === '-y') {
+    // 早期版本要求 --publish 之外再给 --yes；现在不需要了，但老命令别静默做事
+    process.stderr.write('publish-npm: --yes 已不需要（--publish 本身就是确认）；照常继续\n')
+  }
   else if (arg === '--help' || arg === '-h') { printHelp(); process.exit(0) }
   else if (arg.startsWith('-')) fail(`未知参数 ${arg}（--help 看用法）`)
   else fail(`多余的位置参数 ${arg}（这个脚本不接受位置参数）`)
-}
-if (opts.publish && !opts.yes) {
-  // 两道确认：默认只核查是安全默认，真发布再要一次显式确认
-  fail('要真发布必须同时给 --yes（脚本默认只核查与打 tarball）')
 }
 opts.registry = opts.registry.endsWith('/') ? opts.registry : `${opts.registry}/`
 
@@ -125,8 +131,7 @@ function printHelp() {
 默认行为：只核查（工作树/元数据/build/test/tarball/registry），不发布。
 
 发布相关:
-  --publish                真发布。必须同时给 --yes
-  --yes, -y                确认发布
+  --publish                真发布（这一个开关就是确认；不加则只核查）
   --registry <url>         目标 registry（默认 ${PUBLIC_REGISTRY}）
   --tag <tag>              发布 dist-tag（默认：预发布版本用 next，正式版用 latest）
   --otp <code>             2FA 一次性验证码
@@ -146,6 +151,11 @@ function printHelp() {
   --no-tests               跳过 npm test
   --dry-run-pack           只用 npm pack --dry-run 核查 tarball，不落盘
   --help, -h               看这段
+
+经 npm 转发（参数必须在 -- 之后，否则会被 npm 当成自己的配置项）:
+  npm run release:check                             # 只核查
+  npm run release -- --smoke                        # 发布；npm run release 已带 --publish
+  npm run release -- --bump patch --smoke           # 升版发布
 
 本机前提（脚本会检查，缺了会给出确切命令）:
   npm login --registry ${PUBLIC_REGISTRY}
@@ -481,7 +491,7 @@ async function doPublish() {
 
   if (!opts.publish) {
     warn('未加 --publish：只到核查为止，没有真的发布')
-    info('要发布：node scripts/publish-npm.mjs --publish --yes')
+    info('要发布：node scripts/publish-npm.mjs --publish')
     return { published: false }
   }
 
@@ -594,7 +604,7 @@ async function main() {
   if (!publishResult.published) {
     process.stdout.write(`\n${bold('核查完成')}，没有发布。\n`)
     info(`tarball 在 ${TARBALL_DIR}（--dry-run-pack 可只看不落盘）`)
-    info(`发布：node scripts/publish-npm.mjs --publish --yes   # 首次发布 0.1.0 无需 --bump`)
+    info('发布：node scripts/publish-npm.mjs --publish   # 首次发布 0.1.0 无需 --bump')
     return
   }
 
