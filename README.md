@@ -2,7 +2,7 @@
 
 给 [dsh](https://github.com/deepseek-ai/deepseek-harness) Web GUI 换一套 Nord：Nord 配色、Maple Mono 字体栈、设置页开关，以及 composer 下方的 DeepSeek 余额读数。
 
-![Nord 主题](assets/01-theme.png)
+![Nord 主题（深色）](assets/01-theme.png)
 
 ## 功能
 
@@ -15,6 +15,8 @@
 - **设置行** —— 设置 → 通用 → Nord 主题，三项开关加上刷新间隔与 API 地址。
 
   ![设置](assets/02-settings.png)
+
+> 截图是深色下的样子（浅色由同一套 token 的另一半驱动）。三张图由 `node scripts/shots/capture.mjs` 在隔离实例里重拍，见 [DEVELOPMENT.md](DEVELOPMENT.md#截图怎么来的)。
 
 - **宽表格不再抖动** —— 修掉 dsh 上游的一处布局问题：鼠标停在 markdown 宽表格底边时，表格会因为悬停预留高度来回切换而抖动。补丁把 `md-table-wide` 钉在普通 `overflow-x: auto`，不写 DOM、卸载即还原；代价是横向放不下的宽表格会常驻显示横向滚动条（放得下的宽表格照旧没有滚动条）。详见 [DEVELOPMENT.md](DEVELOPMENT.md#宽表格为什么被钉在-auto)。
 

@@ -287,6 +287,30 @@ git 那条的 `allowBuilds` 是唯一需要人工介入的地方，脚本替你�
 - **git 方式不锁定 commit。** 默认用 `github:<owner>/<repo>`（owner/repo 从 `repository` 字段或 `git remote` 推），要复现某个提交请自己给 `--git github:<owner>/<repo>#<sha>`。
 - 每种方式各占一份 `node_modules`（互不共享），`.release-lab` 会到几百 MB 量级；不加 `--keep` 时跑完自动删。
 
+## 截图怎么来的
+
+`assets/` 里三张 README 截图是脚本拍的，不是手点的：
+
+```sh
+node scripts/shots/capture.mjs      # 覆盖 assets/01-theme.png、02-settings.png、03-balance.png
+```
+
+它复用 `release-lab` 那一招——`DSH_HOME` 指向 `.shot-lab/home`（已 gitignore），主 home 全程不被碰——然后：
+
+1. `scripts/shots/lab.mjs` 铺隔离 home：`ui-theme.preference: dark`、`locale: zh`、预置 `ui-onboarding.welcomeNoticeVersion` 免掉「内测声明」弹窗。
+2. 载体是一个**真实会话**：`D:\deepseek-harness\dsh-nord` 工作区里的会话整份拷进隔离 home（含 `storages/session_projcache` 里的摘要，否则侧栏列不出来），再用 Edge 在侧栏点开它。只读，不改原文件。
+3. 余额走本地 mock（`lab.mjs` 里的 `createBalanceMock`），数值与 `tests/balance-mock.mjs` 完全一致：`42.50 / 2.50 / 40.00`。profile 的 `cordis.patch.yml` 把 `baseURL` 指到它。
+4. 页面按 `deviceScaleFactor: 2` 渲染（1440×900 逻辑像素 → 2880×1800 实际像素），再用 sharp 降到目标像素，等价 2x 清晰度。局部图按目标长宽比取裁剪区，缩放不变形。
+
+三张图的舞台尺寸刻意与旧图一致：`01` 1440×900、`02` 816×816（就是设置对话框的 800×800 加一圈背景）、`03` 900×221。实测坐标与「本地验证」里记的一致——余额条 `y=874`，面板 `300×159` 在它上方 8px（`707 = 874 − 8 − 159`）。
+
+两个踩过的坑，改脚本前先看：
+
+- **余额条挂在 `conversation.composer.dock`，而空会话的 hero 页不渲染这个槽。** 在 hero 页上余额条根本不挂载，所以截图必须落在一个真正打开的会话里——这是整个脚本要先「点开会话」的原因。判断依据是 `document.querySelector('[data-slot="conversation.composer.dock"]')` 是否存在，不是页面看起来像不像会话。
+- **当前 dsh 的槽位名是 `conversation.input.dock`。** 源码树（0.1.6-alpha.2）两个名字都在，`composer.dock` 是旧的；本机 `dsh` CLI 是 0.1.5-rc.2（`~/.npmrc` 之外还有一份全局安装），它挂的容器叫 `conversation.input.dock`。插件注册的是 `composer.dock`，在这个版本的会话页里能正常渲染，但换 build 时值得复核一遍。
+
+另外两处细节：载体会话的正文每次都取当下的最新内容（`01` 拍到的是拍摄那一刻的会话尾部），所以重拍时图里的对话文字会变、几何不会——上面那组坐标就是重拍两次核对过的；`npm pack` / `npm publish` 之外不要手工动 `assets/`，脚本是唯一来源；`sharp` 与 `playwright-core` 是这套流程的开发依赖，用本机 Edge（`channel: 'msedge'`），不下载 Chromium。
+
 ## 已知限制
 
 - **没有样式管线。** 仓库内插件用 CSS Modules + 共享 `--dsw-*` token，由仓库的 tsdown preset 在编译期注入样式；树外构建拿不到这一步。设置卡的行距与文字层级用内联 style，控件本身用模块表里的官方 `Switch` / `Input`（它们的 hover / focus 皮肤由 ui-primitives 自己的 CSS Modules 带进来）；余额条与面板由插件自己的一枚 `<style>`（`surfaceStylesheet`）承载——内联 style 表达不了 `:hover` 与 `[aria-expanded]`，而那正是它作为按钮需要的状态。代价是这几条声明是从官方 pill 与官方对话框的 CSS 手工抄来的，官方改版就得手工同步。
