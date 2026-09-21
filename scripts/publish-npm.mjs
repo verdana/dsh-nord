@@ -481,7 +481,7 @@ async function doPublish() {
 
   if (!opts.publish) {
     warn('未加 --publish：只到核查为止，没有真的发布')
-    info(`要发布：node scripts/publish-npm.mjs --bump patch --publish --yes`)
+    info('要发布：node scripts/publish-npm.mjs --publish --yes')
     return { published: false }
   }
 
@@ -594,7 +594,7 @@ async function main() {
   if (!publishResult.published) {
     process.stdout.write(`\n${bold('核查完成')}，没有发布。\n`)
     info(`tarball 在 ${TARBALL_DIR}（--dry-run-pack 可只看不落盘）`)
-    info(`发布：node scripts/publish-npm.mjs ${opts.bump ? `--bump ${opts.bump} ` : ''}--publish --yes`)
+    info(`发布：node scripts/publish-npm.mjs --publish --yes   # 首次发布 0.1.0 无需 --bump`)
     return
   }
 

@@ -88,9 +88,9 @@ npm run lab          # = node scripts/release-lab.mjs
 发布到 npm 也走脚本（默认只核查不发布）：
 
 ```sh
-npm run release:check                                                      # 六道闸门 + tarball 内容清单
-npm login --registry https://registry.npmjs.org/                           # 本机 ~/.npmrc 指向只读镜像，必须显式带 --registry
-node scripts/publish-npm.mjs --bump patch --publish --yes --smoke          # 升版 → 发布 → 打 tag → 从 registry 冒烟装一遍
+npm run release:check                                          # 六道闸门 + tarball 内容清单
+npm login --registry https://registry.npmjs.org/               # 本机 ~/.npmrc 指向只读镜像，必须显式带 --registry
+node scripts/publish-npm.mjs --publish --yes --smoke           # 发布（后续发新版加 --bump patch）→ 打 tag → 从 registry 冒烟装一遍
 ```
 
 ## 许可

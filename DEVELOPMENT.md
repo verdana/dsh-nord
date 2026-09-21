@@ -204,9 +204,9 @@ node scripts/publish-npm.mjs --set-license "Verdana" --create-repo-field
 # 查一遍（不需要 npm 账号）
 npm run release:check
 
-# 登录 + 发布 + 打 git tag + 发布后从 registry 冒烟装一遍
+# 登录 + 发布 + 打 git tag + 发布后从 registry 冒烟装一遍（首次发布 0.1.0，不需要 --bump）
 npm login --registry https://registry.npmjs.org/
-node scripts/publish-npm.mjs --bump patch --publish --yes --smoke
+node scripts/publish-npm.mjs --publish --yes --smoke
 ```
 
 六道闸门，任一不过就停：
