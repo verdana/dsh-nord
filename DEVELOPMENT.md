@@ -256,6 +256,8 @@ node scripts/release-lab.mjs npm --registry https://registry.npmjs.org/
 node scripts/release-lab.mjs --keep --no-boot     # 只查装卸，保留现场
 ```
 
+等价别名：`npm run lab` = `node scripts/release-lab.mjs`（参数用 `--` 传，例如 `npm run lab -- link tarball`）。
+
 它凭什么干净：`@deepseek-ai/dsh-home-paths` 先看 `$DSH_HOME`，所以脚本把它指到仓库里的 `.release-lab/home`（已 gitignore），每种方式配一个一次性 profile（`lab-link` / `lab-tarball` / `lab-npm` / `lab-git`）。**你的 `~/.dsh` 全程不被触碰，脚本也不提供指向真实 profile 的开关。**
 
 每种方式依次过四道：

@@ -43,11 +43,13 @@ dsh --profile web --dump-config   # 应出现 "# == dsh-nord"
 dsh web
 ```
 
-从 GitHub 直接装（`<owner>` 换成仓库所有者，可锁定 commit）：
+从 GitHub 直接装：
 
 ```sh
-dsh plugin --profile web add github:<owner>/dsh-nord#<sha>
+dsh plugin --profile web add github:verdana/dsh-nord#main
 ```
+
+`#main` 取的是分支最新提交；想锁死到某次提交，把 `main` 换成 commit sha 即可。
 
 git 安装需要你在 profile 的 `pnpm-workspace.yaml` 里为该包授权构建脚本（`allowBuilds`），dsh 首次失败时会提示要粘贴的确切内容——这项授权等于允许该包在安装期执行代码，只对可信源码开放。不想让用户做这步，就用上面的 npm 或本地路径安装。
 
@@ -75,24 +77,6 @@ git 安装需要你在 profile 的 `pnpm-workspace.yaml` 里为该包授权构�
     balanceEnabled: true
     refreshSeconds: 60
     baseURL: https://api.deepseek.com
-```
-
-## 开发
-
-见 [DEVELOPMENT.md](DEVELOPMENT.md)：项目结构、机制说明、开发循环、验证记录、发布步骤。
-
-发布后想确认四种安装方式（本地 link / tarball / npm / GitHub）都能装能加载，一条命令跑完，跑在自己的隔离 `$DSH_HOME` 里，不动你的 profile：
-
-```sh
-npm run lab          # = node scripts/release-lab.mjs
-```
-
-发布到 npm 也走脚本（默认只核查不发布）：
-
-```sh
-npm run release:check                                          # 六道闸门 + tarball 内容清单
-npm login --registry https://registry.npmjs.org/               # 本机 ~/.npmrc 指向只读镜像，必须显式带 --registry
-node scripts/publish-npm.mjs --publish --yes --smoke           # 发布（后续发新版加 --bump patch）→ 打 tag → 从 registry 冒烟装一遍
 ```
 
 ## 许可
