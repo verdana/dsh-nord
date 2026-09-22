@@ -35,6 +35,9 @@ const ROW_ORDER = 20
 /** Balance-bar order among the composer dock entries. */
 const BAR_ORDER = 10
 
+/** Deadline for one balance read; the Host answers well inside it. */
+const REQUEST_TIMEOUT_MS = 20_000
+
 /**
  * Mount the theme layer, the font stacks, the settings card, and the balance bar.
  * @param ctx - Client root context.
@@ -134,15 +137,24 @@ export function apply(ctx: ClientContext): void {
 
   // Balance polling. The bar binds its actions when the slot declares, which
   // can land after this effect runs, so the restart hooks are shared.
-  let balanceBound: BoundActions<typeof balanceStore> | undefined
+  //
+  // The dock is session-scoped and every Session owns its own store instance, so
+  // the poll keeps one writer per Session and publishes into all of them. A
+  // single handle is not enough: the renderer caches an entry's inject result per
+  // (entry × scope binding), so returning to an already-visited Session does NOT
+  // run `inject` again — one handle would keep writing into the Session left
+  // behind and freeze the readout the user is actually looking at.
+  const balanceWriters = new Map<string, BoundActions<typeof balanceStore>>()
   /** Restart only when a field the poll reads has actually moved. */
   let syncBalance = (): void => {}
-  /** Restart unconditionally, for the first read the bar can receive. */
+  /** Restart unconditionally, for the first read a newly bound readout can receive. */
   let bindBalance = (): void => {}
 
   ctx.effect(() => {
     let timer: ReturnType<typeof setInterval> | undefined
-    let generation = 0
+    /** Request counter, and the newest request whose result has been applied. */
+    let sequence = 0
+    let landed = 0
     let applied: Config | undefined
     const stop = (): void => {
       if (timer === undefined) return
@@ -150,26 +162,42 @@ export function apply(ctx: ClientContext): void {
       timer = undefined
     }
 
+    /** Fan one update out to every Session's readout. */
+    const publish = (write: (actions: BoundActions<typeof balanceStore>) => void): void => {
+      for (const actions of balanceWriters.values()) write(actions)
+    }
+
     const refresh = async (): Promise<void> => {
-      const mine = ++generation
-      balanceBound?.loading()
+      const mine = ++sequence
+      publish(actions => { actions.loading() })
       try {
-        const response = await fetch(BALANCE_PATH, { headers: { accept: 'application/json' } })
-        const body = await response.json() as BalancePayload | BalanceFailure
-        if (mine !== generation) return
-        if (isBalanceFailure(body)) balanceBound?.failed(body.error)
-        else balanceBound?.ready(body)
+        const response = await fetch(BALANCE_PATH, {
+          headers: { accept: 'application/json' },
+          // A hung Host route would otherwise leave this read pending forever.
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        })
+        const body = await response.json().catch(() => undefined) as BalancePayload | BalanceFailure | undefined
+        // Only a result that a NEWER request already superseded is dropped.
+        // Dropping every read the next tick had merely started froze the readout
+        // for as long as responses stayed slower than the interval.
+        if (mine <= landed) return
+        landed = mine
+        if (body === undefined) publish(actions => { actions.failed('request-failed') })
+        else if (isBalanceFailure(body)) publish(actions => { actions.failed(body.error) })
+        else publish(actions => { actions.ready(body) })
       } catch {
         // Any transport failure is one user-visible outcome; the Host route
         // already reports upstream failures as `upstream-failed` payloads.
-        if (mine === generation) balanceBound?.failed('request-failed')
+        if (mine <= landed) return
+        landed = mine
+        publish(actions => { actions.failed('request-failed') })
       }
     }
 
     const start = (value: Config): void => {
       stop()
       if (!value.balanceEnabled) {
-        balanceBound?.clear()
+        publish(actions => { actions.clear() })
         return
       }
       void refresh()
@@ -198,12 +226,20 @@ export function apply(ctx: ClientContext): void {
       start(value)
     }
 
+    // A hidden tab's interval is throttled, and a discarded one stops firing
+    // outright, so the moment the page is visible again re-reads immediately.
+    const onVisibilityChange = (): void => {
+      if (document.visibilityState === 'visible' && timer !== undefined) void refresh()
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
     const unsubscribe = scope.subscribe(syncBalance)
     syncBalance()
     return () => {
       unsubscribe()
+      document.removeEventListener('visibilitychange', onVisibilityChange)
       stop()
-      generation += 1
+      sequence += 1
       syncBalance = () => {}
       bindBalance = () => {}
     }
@@ -215,8 +251,8 @@ export function apply(ctx: ClientContext): void {
     order: BAR_ORDER,
     locale: LOCALE_NS,
     store: balanceStore,
-    inject: (_sessionId, actions: BoundActions<typeof balanceStore>) => {
-      balanceBound = actions
+    inject: (sessionId, actions) => {
+      balanceWriters.set(sessionId, actions)
       bindBalance()
       return {}
     },

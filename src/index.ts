@@ -74,24 +74,29 @@ async function handleBalance(
   if (!config.balanceEnabled) return sendJson(res, { error: 'disabled' } satisfies BalanceFailure)
   const credentials = ctx.get('credentials')
   if (credentials === undefined) return sendJson(res, { error: 'credentials-unavailable' } satisfies BalanceFailure)
-  const resolved = await credentials.resolve(API_KEY_REF)
-  if (resolved === undefined) return sendJson(res, { error: 'credentials-missing' } satisfies BalanceFailure)
 
-  const url = `${config.baseURL.replace(/\/+$/, '')}/user/balance`
+  // Every failure below — including a throwing credential lookup, which used to
+  // escape this handler and surface as an empty 400 — leaves as one payload.
+  let outcome: BalancePayload | BalanceFailure
   try {
-    const response = await fetch(url, {
-      headers: { authorization: `Bearer ${resolved.value}` },
-      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-    })
-    if (!response.ok) {
-      return sendJson(res, { error: 'upstream-failed', status: response.status } satisfies BalanceFailure)
+    const resolved = await credentials.resolve(API_KEY_REF)
+    if (resolved === undefined) outcome = { error: 'credentials-missing' }
+    else {
+      const url = `${config.baseURL.replace(/\/+$/, '')}/user/balance`
+      const response = await fetch(url, {
+        headers: { authorization: `Bearer ${resolved.value}` },
+        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+      })
+      if (!response.ok) outcome = { error: 'upstream-failed', status: response.status }
+      else {
+        const payload = parseBalance(await response.json(), Date.now())
+        outcome = payload ?? { error: 'malformed-response' }
+      }
     }
-    const payload = parseBalance(await response.json(), Date.now())
-    if (payload === undefined) return sendJson(res, { error: 'malformed-response' } satisfies BalanceFailure)
-    return sendJson(res, payload)
   } catch (error) {
-    return sendJson(res, { error: 'request-failed', detail: errorMessage(error) } satisfies BalanceFailure)
+    outcome = { error: 'request-failed', detail: errorMessage(error) }
   }
+  return sendJson(res, outcome)
 }
 
 /**
