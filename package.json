@@ -1,6 +1,6 @@
 {
   "name": "dsh-nord",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "description": "Nord theme, selectable interface and code font stacks, a settings row, and a DeepSeek balance readout with a detail panel for the dsh Web GUI.",
   "type": "module",
   "license": "MIT",
