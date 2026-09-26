@@ -1,18 +1,18 @@
 # dsh-nord
 
-给 [dsh](https://github.com/deepseek-ai/deepseek-harness) Web GUI 换一套 Nord：Nord 配色、Maple Mono 字体栈、设置页开关，以及 composer 下方的 DeepSeek 余额读数。
+给 [dsh](https://github.com/deepseek-ai/deepseek-harness) Web GUI 换一套 Nord：Nord 配色、可选字体、一页自己的设置，以及 composer 下方的 DeepSeek 余额读数。
 
 ![Nord 主题（深色）](assets/01-theme.png)
 
 ## 功能
 
 - **Nord 配色** —— 116 个设计 token，浅色与深色两套，跟随 dsh 的「外观」设置切换；不写死颜色、不改 DOM，卸载即还原。
-- **Maple Mono 字体** —— 界面字体与代码字体一起换，跟随「字号大小」设置派生。
+- **字体可选** —— 界面字体与代码字体分开选：跟随系统、八个预设（Maple Mono、JetBrains Mono、Cascadia Code、Fira Code、更纱黑体、霞鹜文楷、HarmonyOS Sans、MiSans），或者自己填一条 CSS `font-family`。预设是一整条回退栈，没装的家族自动落到下一个，中文回退由插件补在后面；下拉里的每一行用它自己的字体渲染，所以挑之前就能看到实际效果。界面字号仍跟随 dsh 的「字号大小」设置派生。
 - **余额读数** —— composer 下方，与官方的轮次/步骤统计在同一行。点击弹出明细面板。用 DeepSeek 模型时（或余额接口就是 DeepSeek 时），面板底部多一行「用量信息」，直达 [platform.deepseek.com/usage](https://platform.deepseek.com/usage)；其他供应商的面板保持原样。
 
   ![余额明细](assets/03-balance.png)
 
-- **设置行** —— 设置 → 通用 → Nord 主题，三项开关加上刷新间隔与 API 地址。
+- **独立的设置页** —— 设置面板左栏多一项「Nord 主题」，排在官方分区之后；本插件不再往「通用」里塞行。页面分外观、字体、余额条三组。
 
   ![设置](assets/02-settings.png)
 
@@ -57,27 +57,39 @@ git 安装需要你在 profile 的 `pnpm-workspace.yaml` 里为该包授权构�
 
 ## 设置
 
-设置 → 通用 → Nord 主题：
+设置面板 → 左栏「Nord 主题」（排在通用设置、模型、插件、Agent 预设之后）：
 
 | 字段 | 默认 | 说明 |
 |---|---|---|
 | `themeEnabled` | true | 叠加 Nord 配色 |
-| `fontEnabled` | true | 替换字体栈 |
+| `fontEnabled` | true | 替换字体栈；关掉即回到 dsh 自带字体 |
+| `uiFont` | `maple` | 界面字体：预设 id、`system`（跟随系统）或 `custom` |
+| `uiFontCustom` | 空 | `uiFont: custom` 时使用的 CSS `font-family` 列表 |
+| `codeFont` | `maple` | 代码字体：预设 id、`system`、`inherit`（跟随界面）或 `custom` |
+| `codeFontCustom` | 空 | `codeFont: custom` 时使用的 CSS `font-family` 列表 |
 | `balanceEnabled` | true | 显示底部余额条 |
 | `refreshSeconds` | 60 | 余额刷新间隔，15–3600 |
 | `baseURL` | `https://api.deepseek.com` | 余额接口地址 |
 
-也可以在 profile 的 `cordis.patch.yml` 里按 `id: dsh-nord` 覆盖。patch 会**整体替换**目标行的 `config`，所以要重述所有键：
+预设 id：`maple`、`jetbrains`、`cascadia`、`fira`、`sarasa`、`lxgw`、`harmony`、`misans`。
+
+也可以在 profile 的 `cordis.patch.yml` 里按 `id: dsh-nord` 覆盖。patch 会**整体替换**目标行的 `config`，所以要重述所有键（缺的键由 schema 默认值补上，所以旧 patch 仍然能启动）：
 
 ```yaml
 - id: dsh-nord
   config:
     themeEnabled: true
     fontEnabled: true
+    uiFont: maple
+    uiFontCustom: ''
+    codeFont: inherit
+    codeFontCustom: ''
     balanceEnabled: true
     refreshSeconds: 60
     baseURL: https://api.deepseek.com
 ```
+
+`uiFontCustom` / `codeFontCustom` 按 CSS `font-family` 语法写，逗号分隔，例如 `'LXGW WenKai', 'Microsoft YaHei'`。插件只保留能识别的家族名（分号、花括号、引号、括号等一律丢弃），再用引号重新拼好，并在末尾补上中文回退；`sans-serif` 这类通用族保持不加引号。
 
 ## 许可
 

@@ -6,6 +6,8 @@
  *   so `npm test` runs it under plain Node without booting the plugin.
  * - `src/usage.ts`        → `lib/usage.js`   the usage-link decision, split off
  *   the browser half for the same reason.
+ * - `src/fonts.ts`        → `lib/fonts.js`   the font catalog and the resolver
+ *   that rebuilds a user-typed family list, split off for the same reason.
  * - `src/client/index.ts` → `lib/client.js`  the browser half the Web shell
  *   fetches through the `/plugins` combo route.
  *
@@ -41,7 +43,7 @@ const isPlatformModule = (specifier: string): boolean => PLATFORM_MODULES.includ
 const config: UserConfig[] = [
   {
     name: PACKAGE_NAME,
-    entry: ['src/index.ts', 'src/balance.ts', 'src/usage.ts'],
+    entry: ['src/index.ts', 'src/balance.ts', 'src/usage.ts', 'src/fonts.ts'],
     outDir: 'lib',
     format: ['esm'],
     platform: 'node',

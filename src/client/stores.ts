@@ -65,7 +65,7 @@ export interface NordBalanceState {
   /**
    * Balance endpoint the poll is configured against. The panel's usage link
    * falls back to it when the Session carries no model selection, so the
-   * endpoint travels with the reading rather than with the settings card.
+   * endpoint travels with the reading rather than with the settings page.
    */
   baseURL: string
 }

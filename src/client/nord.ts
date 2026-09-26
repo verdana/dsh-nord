@@ -11,6 +11,7 @@
  * and every derived family follows.
  */
 import type { ThemeTokenOverrides } from '@deepseek-ai/dsh-client-ui-theme/client'
+import type { FontStacks } from '../fonts.ts'
 
 /** The sixteen official Nord colors (nord0–nord15). */
 const P = {
@@ -59,19 +60,18 @@ export const PANEL_ATTR = 'data-dsh-nord-panel'
 /** Attribute marking the panel's usage-link row. */
 export const USAGE_ATTR = 'data-dsh-nord-usage'
 
-/** Maple Mono first, then the upstream Chinese and Latin fallbacks. */
-export const UI_FONT_STACK = "'Maple Mono', 'Maple Mono NF CN', ui-sans-serif, -apple-system, "
-  + "BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', "
-  + "'Helvetica Neue', Helvetica, Arial, sans-serif"
+/** Attribute marking this plugin's own settings page. */
+export const SETTINGS_ATTR = 'data-dsh-nord-settings'
+
+/** Section id this plugin registers into the settings nav (and `only` key). */
+export const SECTION_ID = 'dsh-nord'
 
 /**
- * Code stack. The bare `monospace` tail is deliberately absent: Windows CJK
- * falls back to SimSun through it, which `ui-theme/src/styles/base.css` records
- * for the upstream stack as well.
+ * Nav position. The shipped sections occupy 0 (General), 10 (Models), 15
+ * (Plugins) and 20 (Agent presets), so a third-party page takes the same `40`
+ * the reference community plugin uses and lands after all of them.
  */
-export const CODE_FONT_STACK = "'Maple Mono', 'Maple Mono NF CN', ui-monospace, 'SF Mono', "
-  + "'JetBrains Mono', 'Fira Code', Consolas, 'Liberation Mono', Menlo, Courier, "
-  + "'PingFang SC', 'Microsoft YaHei'"
+export const SECTION_ORDER = 40
 
 /**
  * `[token, light, dark]`. `--dsw-alias-*` carry the semantic surface; the
@@ -234,10 +234,14 @@ export function nordTokens(): ThemeTokenOverrides {
 
 /**
  * The `:root` rule that replaces both upstream font stacks.
+ *
+ * The stacks arrive already resolved and already rebuilt from validated family
+ * names (`src/fonts.ts`), so no user-typed text reaches this string as text.
+ * @param stacks - the two resolved family lists.
  * @returns stylesheet text for one `<style>` element.
  */
-export function fontStylesheet(): string {
-  return `:root{--dsw-font-family:${UI_FONT_STACK};--ds-font-family-code:${CODE_FONT_STACK};}`
+export function fontStylesheet(stacks: FontStacks): string {
+  return `:root{--dsw-font-family:${stacks.ui};--ds-font-family-code:${stacks.code};}`
 }
 
 /**

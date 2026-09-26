@@ -13,10 +13,11 @@ import type {} from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-theme/client'
 import { isBalanceFailure, type BalanceFailure, type BalancePayload } from '../balance.ts'
 import { BALANCE_PATH, DEFAULTS, NS, type Config } from '../config.ts'
+import { fontStacks } from '../fonts.ts'
 import { BalanceBar } from './BalanceBar.tsx'
 import { en, LOCALE_NS, zh } from './locales.ts'
-import { FONT_STYLE_ID, fontStylesheet, nordTokens, SURFACE_STYLE_ID, surfaceStylesheet, TABLE_STYLE_ID, tableStylesheet, TOKEN_SOURCE } from './nord.ts'
-import { NordCard } from './NordCard.tsx'
+import { FONT_STYLE_ID, fontStylesheet, nordTokens, SECTION_ID, SECTION_ORDER, SURFACE_STYLE_ID, surfaceStylesheet, TABLE_STYLE_ID, tableStylesheet, TOKEN_SOURCE } from './nord.ts'
+import { NordSection } from './NordSection.tsx'
 import { createNordBalanceStore, createNordSettingsStore } from './stores.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -29,9 +30,6 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 /** Required services: the theme registry, slots, copy, and the durable settings scope. */
 export const inject = ['theme', 'slots', 'locale', 'settingsScope']
 
-/** Nord preference-row order inside the General section. */
-const ROW_ORDER = 20
-
 /** Balance-bar order among the composer dock entries. */
 const BAR_ORDER = 10
 
@@ -39,13 +37,16 @@ const BAR_ORDER = 10
 const REQUEST_TIMEOUT_MS = 20_000
 
 /**
- * Mount the theme layer, the font stacks, the settings card, and the balance bar.
+ * Mount the theme layer, the font stacks, this plugin's settings page, and the
+ * balance bar.
  * @param ctx - Client root context.
  */
 export function apply(ctx: ClientContext): void {
   const scope = ctx.settingsScope.bind<Config>({ namespace: NS })
   const settingsStore = createNordSettingsStore()
   const balanceStore = createNordBalanceStore()
+  /** Bound once: repeat binds return the same function, and the nav thunk reads it. */
+  const t = ctx.locale.bind(LOCALE_NS)
 
   /** Durable section folded over the composition defaults. */
   const effective = (): Config => ({ ...DEFAULTS, ...scope.getSnapshot().value })
@@ -54,11 +55,16 @@ export function apply(ctx: ClientContext): void {
 
   // Font stacks ride one `:root` rule: every composite family is declared there
   // as `var(--dsw-font-family)`, so a body-level token override cannot reach it.
+  // The rule is rewritten from the resolved stacks on every accepted write, and
+  // emptied — not merely left stale — while the layer is off.
   ctx.effect(() => {
     const element = document.createElement('style')
     element.id = FONT_STYLE_ID
     document.head.append(element)
-    const sync = (): void => { element.textContent = effective().fontEnabled ? fontStylesheet() : '' }
+    const sync = (): void => {
+      const value = effective()
+      element.textContent = value.fontEnabled ? fontStylesheet(fontStacks(value)) : ''
+    }
     const unsubscribe = scope.subscribe(sync)
     sync()
     return () => { unsubscribe(); element.remove() }
@@ -99,7 +105,7 @@ export function apply(ctx: ClientContext): void {
     return () => { unsubscribe(); applied?.() }
   }, 'dsh-nord: nord tokens')
 
-  // Settings-card mirror.
+  // Settings-page mirror.
   let settingsBound: BoundActions<typeof settingsStore> | undefined
   const syncSettings = (): void => {
     const snapshot = scope.getSnapshot()
@@ -116,24 +122,34 @@ export function apply(ctx: ClientContext): void {
     return unsubscribe
   }, 'dsh-nord: settings mirror')
 
-  ctx.slots.inject('settings.general.item', () => ctx.slots.register({
-    name: 'settings.general.item',
-    id: NS,
-    order: ROW_ORDER,
+  // This plugin's own page in the settings panel: one nav row plus the content
+  // column, contributed to the settings domain's `settings.section` list. The
+  // shell owns the panel, the nav chrome, and the scrolling; a feature owns its
+  // own page, which is why nothing here also lands in the General section.
+  ctx.slots.inject('settings.section', () => ctx.slots.register({
+    name: 'settings.section',
+    id: SECTION_ID,
+    order: SECTION_ORDER,
+    // A thunk, not a string: the shell re-reads the label on every locale
+    // revision, so the nav row follows a language switch without the plugin
+    // re-registering the entry.
+    label: () => t('nav'),
     locale: LOCALE_NS,
     store: settingsStore,
     inject: (actions: BoundActions<typeof settingsStore>) => {
       settingsBound = actions
       syncSettings()
       return {
-        save: (field: string, value: unknown): void => {
-          void scope.set(field, value).catch((cause: unknown) => {
+        // One write settles before the caller's next step when the caller
+        // chains; rejecting is turned into the page's own failure line here, so
+        // a caller that ignores the promise leaves no unhandled rejection.
+        save: (field: string, value: unknown): Promise<void> =>
+          scope.set(field, value).catch((cause: unknown) => {
             settingsBound?.failed(cause instanceof Error ? cause.message : String(cause))
-          })
-        },
+          }),
       }
     },
-  }, NordCard))
+  }, NordSection))
 
   // Balance polling. The bar binds its actions when the slot declares, which
   // can land after this effect runs, so the restart hooks are shared.

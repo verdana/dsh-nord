@@ -151,11 +151,15 @@ try {
   await page.keyboard.press('Escape')
   await sleep(800)
 
-  // ── 02 设置卡 ──────────────────────────────────────────────────────────
+  // ── 02 设置页 ──────────────────────────────────────────────────────────
   const settings = page.locator('button, [role="button"], a').filter({ hasText: /^设置$/ })
   await settings.first().click()
-  await waitFor(page, '设置对话框与 Nord 卡', () => page.evaluate(() =>
-    [...document.querySelectorAll('[role="dialog"]')].some((el) => el.innerText.includes('Nord 主题'))))
+  await waitFor(page, '设置对话框与左栏入口', () => page.evaluate(() =>
+    [...document.querySelectorAll('[role="dialog"] nav button')].some((el) => el.innerText.trim() === 'Nord 主题')))
+  // 本插件有自己的一页：点开左栏那一行再拍，拍到的是页面本身而不是「通用」里的卡片。
+  await page.getByRole('button', { name: 'Nord 主题', exact: true }).click()
+  await waitFor(page, 'Nord 设置页', () => page.locator('[data-dsh-nord-settings]').count().then((n) => n === 1))
+  await sleep(800)
   const dialogRect = await box(page.locator('[role="dialog"]').last())
   const settingsClip = clipFor(dialogRect, TARGETS['02-settings.png'])
   console.log('设置对话框 rect:', JSON.stringify(dialogRect), '→ 裁剪', JSON.stringify(settingsClip))
