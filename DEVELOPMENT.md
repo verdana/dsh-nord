@@ -214,7 +214,7 @@ DEEPSEEK_API_KEY=test-key dsh --profile web
 
 已经验证过的内容：
 
-- `npm run typecheck`、`npm run build` 通过；`lib/client.js` 只把模块表里的 specifier 留作 external，其余内联，banner/intro/footer 符合 `__ModuleLoader__.load({ id: "dsh-nord", … })` 契约并导出 `apply` / `inject`；产物 64.65 kB（gzip 18.36 kB）。其中拆出 `src/schema.ts` 省下的正是内联的 schemastery 与 cosmokit（70.66 → 42.26 kB）；字体选择器把它推回 64.65 kB，因为这一版新引了官方 `Menu` 与 `Button`（连同它们的 CSS Module 与图标），外加 `src/fonts.ts` 的预设目录与清洗逻辑。五个纯模块产物：`lib/index.js` 36.62 kB、`lib/fonts.js` 8.19 kB、`lib/usage.js` 1.88 kB、`lib/balance.js` 1.19 kB。
+- `npm run typecheck`、`npm run build` 通过；`lib/client.js` 只把模块表里的 specifier 留作 external，其余内联，banner/intro/footer 符合 `__ModuleLoader__.load({ id: "dsh-nord", … })` 契约并导出 `apply` / `inject`；产物 66.02 kB（gzip 18.76 kB）。其中拆出 `src/schema.ts` 省下的正是内联的 schemastery 与 cosmokit（70.66 → 42.26 kB）；字体选择器与独立设置页把它推回 66.02 kB，因为这一版新引了官方 `Menu` 与 `Button`（连同它们的 CSS Module 与图标），外加 `src/fonts.ts` 的预设目录与清洗逻辑。Node 半边四个产物：`lib/index.js` 36.62 kB、`lib/fonts.js` 8.19 kB、`lib/usage.js` 1.88 kB、`lib/balance.js` 1.19 kB。
 - `npm test` 通过：`tests/balance.test.mjs` 的 8 条规格跑在构建产物 `lib/balance.js` 上，覆盖正常字段、多币种取首条、`is_available` 缺失或为 `false`、条目字段缺失回退、数值型余额、非字符串 `currency`，以及 `balance_infos` 缺失 / 空数组 / 非数组 / 首项非对象都归到 `malformed-response`；`tests/fonts.test.mjs` 的 17 条规格跑在 `lib/fonts.js` 上，覆盖默认值、`system` 逐字等于上游栈、`inherit` 与界面栈相等、预设解析、未知 id 回落、引号剥离、恶意字符丢弃、单条坏名字不牵连整条列表、解析结果里没有 `;{}`、通用族不加引号、CJK 与重音名字存活、去重与两项上限。
 - 调色板：直接求值 `nordTokens()` 得 116 项（81 alias + 10 specific + 25 static），`--dsw-alias-bg-base` = `{light:#ECEFF4, dark:#2E3440}`。
 - 安装：`dsh plugin add` 后 `dsh.profile.bundles` 追加成功，`--dump-config` 出现 `# == dsh-nord` 层；tarball 安装路径同样验证过（见下节彩排）。
@@ -294,9 +294,9 @@ npm run release:check                                 # 六道闸门 + tarball �
 node scripts/release-lab.mjs link tarball             # 用隔离 home 把这两条装法过一遍
 ```
 
-发新版本：`node scripts/publish-npm.mjs --bump patch --publish` → 用户侧 `dsh plugin --profile web update dsh-nord`（`dsh plugin` 把参数转发给 pnpm）。
+发新版本：`node scripts/publish-npm.mjs --bump minor --publish`（`--bump` 取值同 `npm version`：修 bug 用 `patch`、加能力用 `minor`）→ 用户侧 `dsh plugin --profile web update dsh-nord`（`dsh plugin` 把参数转发给 pnpm）。
 
-发布包只含 `lib/`、`cordis.patch.yml`、`README.md`、`LICENSE`、`package.json`（8 个文件：`lib/` 下 4 个含 `client.js.map`）；`src/`、`tests/`、`scripts/`、`assets/`、`tsdown.config.ts`、`tsconfig.json` 都不进包，第 4 道闸门会核对这份清单。
+发布包只含 `lib/`、`cordis.patch.yml`、`README.md`、`LICENSE`、`package.json`（10 个文件：`lib/` 下 6 个 —— `index.js`、`balance.js`、`usage.js`、`fonts.js`、`client.js` 与 `client.js.map`）；`src/`、`tests/`、`scripts/`、`assets/`、`tsdown.config.ts`、`tsconfig.json` 都不进包，第 4 道闸门会核对这份清单。
 
 ## 发布后的四种安装方式，一次跑完
 
