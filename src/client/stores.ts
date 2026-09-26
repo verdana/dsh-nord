@@ -62,11 +62,18 @@ export interface NordBalanceState {
   fetchedAt: number
   /** Failure code resolved through the `error.*` dictionary keys. */
   error: string
+  /**
+   * Balance endpoint the poll is configured against. The panel's usage link
+   * falls back to it when the Session carries no model selection, so the
+   * endpoint travels with the reading rather than with the settings card.
+   */
+  baseURL: string
 }
 
 /** Declared write surface of the balance bar. */
 type NordBalanceActions = {
   clear: (draft: NordBalanceState) => void
+  endpoint: (draft: NordBalanceState, baseURL: string) => void
   loading: (draft: NordBalanceState) => void
   ready: (draft: NordBalanceState, payload: BalancePayload) => void
   failed: (draft: NordBalanceState, error: string) => void
@@ -87,9 +94,11 @@ export function createNordBalanceStore(): EngineStoreHandle<NordBalanceState, No
       available: true,
       fetchedAt: 0,
       error: '',
+      baseURL: DEFAULTS.baseURL,
     }),
     actions: {
       clear: (d) => { d.phase = 'idle'; d.error = '' },
+      endpoint: (d, baseURL) => { d.baseURL = baseURL },
       // A refresh keeps the last reading on screen — the bar is a status strip,
       // and swapping the numbers for a pending label every interval would blank
       // an open panel. Only a first load, or one after a failure, is pending.

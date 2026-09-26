@@ -196,6 +196,9 @@ export function apply(ctx: ClientContext): void {
 
     const start = (value: Config): void => {
       stop()
+      // The endpoint travels with the reading: the panel's usage link falls
+      // back to it when the Session carries no model selection.
+      publish(actions => { actions.endpoint(value.baseURL) })
       if (!value.balanceEnabled) {
         publish(actions => { actions.clear() })
         return

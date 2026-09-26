@@ -8,7 +8,7 @@
 
 - **Nord 配色** —— 116 个设计 token，浅色与深色两套，跟随 dsh 的「外观」设置切换；不写死颜色、不改 DOM，卸载即还原。
 - **Maple Mono 字体** —— 界面字体与代码字体一起换，跟随「字号大小」设置派生。
-- **余额读数** —— composer 下方，与官方的轮次/步骤统计在同一行。点击弹出明细面板。
+- **余额读数** —— composer 下方，与官方的轮次/步骤统计在同一行。点击弹出明细面板。用 DeepSeek 模型时（或余额接口就是 DeepSeek 时），面板底部多一行「用量信息」，直达 [platform.deepseek.com/usage](https://platform.deepseek.com/usage)；其他供应商的面板保持原样。
 
   ![余额明细](assets/03-balance.png)
 

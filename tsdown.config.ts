@@ -4,6 +4,8 @@
  * - `src/index.ts`        → `lib/index.js`   the Node half the Loader mounts.
  * - `src/balance.ts`      → `lib/balance.js` the balance projection on its own,
  *   so `npm test` runs it under plain Node without booting the plugin.
+ * - `src/usage.ts`        → `lib/usage.js`   the usage-link decision, split off
+ *   the browser half for the same reason.
  * - `src/client/index.ts` → `lib/client.js`  the browser half the Web shell
  *   fetches through the `/plugins` combo route.
  *
@@ -39,7 +41,7 @@ const isPlatformModule = (specifier: string): boolean => PLATFORM_MODULES.includ
 const config: UserConfig[] = [
   {
     name: PACKAGE_NAME,
-    entry: ['src/index.ts', 'src/balance.ts'],
+    entry: ['src/index.ts', 'src/balance.ts', 'src/usage.ts'],
     outDir: 'lib',
     format: ['esm'],
     platform: 'node',

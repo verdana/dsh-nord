@@ -9,6 +9,7 @@ src/index.ts               Host 半边：设置段 + GET /nord/balance 路由
 src/config.ts              两侧共用的配置类型、默认值与 NS / BALANCE_PATH 常量
 src/schema.ts              Host 独有的 durable schema，唯一 import schemastery 的模块
 src/balance.ts             余额载荷类型，以及上游文档到载荷的投影
+src/usage.ts               用量信息链接的判定：会话模型供应商优先，余额地址兜底
 src/client/index.ts        浏览器半边：主题层、字体、样式表、设置卡、余额轮询、两个 slot 注册
 src/client/nord.ts         Nord 调色板（116 token）、字体栈、余额表面与宽表格补丁的 CSS
 src/client/BalanceBar.tsx  余额读数与其明细面板
@@ -16,6 +17,7 @@ src/client/NordCard.tsx    设置行的开关与字段
 src/client/stores.ts       设置卡与余额的 slot store
 src/client/locales.ts      `dshNord` 命名空间的中英文案
 tests/balance.test.mjs     投影的 `node --test` 规格
+tests/usage.test.mjs       用量链接判定的 `node --test` 规格
 tests/balance-mock.mjs     上游 `/user/balance` 的本地替身
 scripts/release-lab.mjs    隔离 `$DSH_HOME`，逐个验证四种安装方式（见「发布后的四种安装方式」）
 scripts/publish-npm.mjs    发布流水线：六道闸门 + tarball 核查 + 真发布（见「发布到 npm」）
@@ -32,6 +34,7 @@ assets/                    README 截图
 | Maple Mono 字体 | 一枚 `<style>` 里的 `:root` 规则 |
 | 余额 | Host 侧 `webServer` 上的 `GET /nord/balance`，用 `ctx.credentials` 解析 `DEEPSEEK_API_KEY`；浏览器侧是 dock 里一枚可点击读数 + 明细面板 |
 | 余额投影 | `src/balance.ts` 的 `parseBalance()`：上游文档 → 载荷，Host 路由与 `npm test` 共用同一份实现 |
+| 用量信息链接 | `src/usage.ts` 的 `usageLink()`：会话模型供应商（Host 的 `modelSelection` 投影）优先，取不到时看余额地址域名；非 DeepSeek 账号面板不变 |
 | 设置项 | Host `ctx.settings.installSection()` + 浏览器侧 `settings.general.item` 行，持久化进 `settings.yaml` |
 | 设置卡控件 | 模块表基线里的 `@deepseek-ai/dsh-client-ui-primitives`：布尔项用 `Switch`、字段用 `Input`，行距与配色走内联 style |
 | 余额表面的样式 | 插件自己的一枚 `<style>`（`surfaceStylesheet`）：dock 行规则、读数皮肤、面板皮肤 |
@@ -118,6 +121,17 @@ div[data-slot="conversation.composer.dock"]:has(> [data-dsh-nord-bar]) {
 | 更新时间 | 浏览器本地时间 | `fetchedAt`（Host 读取时刻） |
 
 轮询不做清屏：`loading` 只在「还没有成功读数」（首次加载或上次失败）时才进入 pending，成功过一次之后原地更新。否则每 15–60 秒会让面板跟着读数一起闪掉一次。
+
+### 用量信息这一行为什么要检测
+
+面板底部的「用量信息」链接（→ `platform.deepseek.com/usage`，右对齐，`target="_blank"`）只对 DeepSeek 账号有意义，判定在 `src/usage.ts` 里，两个信号按顺序看：
+
+1. **会话的模型供应商**。`conversation.composer.dock` 是 session 作用域槽位，shell 的 `ui-session` 适配器会往每个 session 作用域条目投递标准套件，其中 `useProjection('modelSelection')` 就是 Host 对当前会话的模型选择投影（`{ lastUsed, pending }`，客户端视图多一个 `next`）。`next.provider` 以 `deepseek` 开头即算 DeepSeek——`dsh-llm-deepseek` 注册的路由键正是 `deepseek-official`。
+2. **余额地址兜底**。会话还没选过模型时投影是空的（新会话、没发过消息），此时看这次读数用的端点：`baseURL` 的域名是 `deepseek.com` 或其子域才算 DeepSeek。端点因此进了余额 store（`endpoint` action），由 apply-world 的轮询随读数一起发布——面板的数字本来就来自那条轮询，端点属于同一次读数的上下文。
+
+两个信号都不成立时这一行根本不渲染，面板与之前完全一致。
+
+类型上有一处妥协：`useProjection` 这个座位由 shell 的 `ui-session` 投递，而它的类型入口 import 的 `@deepseek-ai/dsh-api-session-controller` 又 peer 依赖 Host 部署包 `dsh-agent-default-model`，这条 Host 依赖图不该进插件。所以 `@deepseek-ai/dsh-client-ui-session` 只作为 devDependency 引入（让座位在类型上存在，运行时不 require 它），读到的那一层投影形状在 `BalanceBar.tsx` 里按需声明、读取处断言一次。运行时 `ui-session` 是 web profile 的常驻插件，座位一定在场；`?? NO_PROJECTION` 只是让「某个 shell 不投递座位」也不至于把读数带崩（同一挂载期内座位不会有、也不会消失，因此 hook 顺序稳定）。
 
 ### 为什么 schema 单独一个文件
 

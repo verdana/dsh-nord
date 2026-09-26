@@ -56,6 +56,9 @@ export const BAR_ATTR = 'data-dsh-nord-bar'
 /** Attribute marking the portaled balance panel. */
 export const PANEL_ATTR = 'data-dsh-nord-panel'
 
+/** Attribute marking the panel's usage-link row. */
+export const USAGE_ATTR = 'data-dsh-nord-usage'
+
 /** Maple Mono first, then the upstream Chinese and Latin fallbacks. */
 export const UI_FONT_STACK = "'Maple Mono', 'Maple Mono NF CN', ui-sans-serif, -apple-system, "
   + "BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', "
@@ -260,7 +263,8 @@ export function tableStylesheet(): string {
  * because it has interaction states (hover, `aria-expanded`) that inline styles
  * cannot express. The panel mirrors the shipped stat dialog skin
  * (`ui-chat/src/client/chat/stat-dialog.module.css`) token for token, so it
- * reads as the same surface as the two pills beside it.
+ * reads as the same surface as the two pills beside it; its DeepSeek-only usage
+ * row is the one extra, skinned as the link colour of that same skin.
  *
  * The first rule is the dock row. The composer dock is one outlet per slot, and
  * 0.1.5 lays that outlet's entries out in the composer column — every
@@ -299,5 +303,10 @@ export function surfaceStylesheet(): string {
     `[${PANEL_ATTR}] dt,[${PANEL_ATTR}] dd{min-width:0;margin:0;}`,
     `[${PANEL_ATTR}] dd{color:var(--dsw-alias-label-secondary);font-variant-numeric:tabular-nums;`
     + 'text-align:right;}',
+    // The usage row is a DeepSeek-only extra, so it is simply absent for any
+    // other account; right-aligned, it reads as one more row of the same list.
+    `[${PANEL_ATTR}] > p[${USAGE_ATTR}]{display:flex;justify-content:flex-end;margin:8px 0 0;}`,
+    `[${PANEL_ATTR}] > p[${USAGE_ATTR}] a{color:var(--dsw-alias-link);text-decoration:none;}`,
+    `[${PANEL_ATTR}] > p[${USAGE_ATTR}] a:hover{text-decoration:underline;}`,
   ].join('')
 }

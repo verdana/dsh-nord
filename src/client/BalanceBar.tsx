@@ -4,8 +4,10 @@ import { createPortal } from 'react-dom'
 import { useAnchoredPosition, useDismissOnOutsidePointer } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type {} from '@deepseek-ai/dsh-client-ui-session/client'
+import { usageLink } from '../usage.ts'
 import type { NordKey } from './locales.ts'
-import { BAR_ATTR, PANEL_ATTR } from './nord.ts'
+import { BAR_ATTR, PANEL_ATTR, USAGE_ATTR } from './nord.ts'
 import type { createNordBalanceStore } from './stores.ts'
 
 /** Full component props: session runtime share + store + locale seat. */
@@ -15,13 +17,17 @@ export type BalanceBarProps =
   & PropsLocale<'dshNord'>
 
 /**
- * Attributes for the two surfaces. Spread rather than written literally so the
- * selectors in `surfaceStylesheet` and the markup cannot drift apart.
+ * Attributes for the three surfaces (readout, panel, usage row). Spread rather
+ * than written literally so the selectors in `surfaceStylesheet` and the markup
+ * cannot drift apart.
  */
 const BAR_PROPS = { [BAR_ATTR]: '' } as const
 
 /** Panel container attribute. */
 const PANEL_PROPS = { [PANEL_ATTR]: '' } as const
+
+/** Attribute marking the panel's usage-link row. */
+const USAGE_PROPS = { [USAGE_ATTR]: '' } as const
 
 /** Viewport margin the placement clamp keeps (the shipped stat dialog's). */
 const PANEL_MARGIN = 12
@@ -31,6 +37,21 @@ const PANEL_GAP = 8
 
 /** Unplaced portal panel: hidden but laid out so the clamp measures real dimensions. */
 const MEASURE_STYLE: CSSProperties = { visibility: 'hidden', left: 0, top: 0 }
+
+/**
+ * The `modelSelection` projection as the panel reads it: the Host's durable
+ * model-selection fold, narrowed to the one field the usage link consults.
+ */
+interface ModelSelectionProjection {
+  /** Selection the next request should use; null before the Session has one. */
+  readonly next: { readonly provider: string } | null
+}
+
+/** The Session standard kit's projection reader (`ui-session` supplies the seat). */
+type ProjectionReader = (key: string) => ModelSelectionProjection | undefined
+
+/** Reader used when the shell ships no `ui-session` adapter: no selection, no link. */
+const NO_PROJECTION: ProjectionReader = () => undefined
 
 /** Failure codes the dictionary carries copy for. */
 const ERROR_KEYS: Record<string, NordKey> = {
@@ -77,7 +98,7 @@ function stampLabel(fetchedAt: number, t: BalanceBarProps['t']): string {
  * @param props - composed slot props.
  * @returns the bar element, or null while the readout is not in use.
  */
-export function BalanceBar({ useStore, t }: BalanceBarProps) {
+export function BalanceBar({ useStore, t, useProjection }: BalanceBarProps) {
   const phase = useStore(s => s.phase)
   const currency = useStore(s => s.currency)
   const total = useStore(s => s.total)
@@ -86,6 +107,18 @@ export function BalanceBar({ useStore, t }: BalanceBarProps) {
   const available = useStore(s => s.available)
   const fetchedAt = useStore(s => s.fetchedAt)
   const error = useStore(s => s.error)
+  const baseURL = useStore(s => s.baseURL)
+
+  // The Session's live model provider is the primary account signal. The seat
+  // itself stays `any` in this plugin — the shell's `ui-session` type entry
+  // resolves the controller types of a Host deployment package this plugin does
+  // not depend on — so `ModelSelectionProjection` above declares the one key
+  // read here and the reader is asserted once. The fallback only covers a shell
+  // that delivers no seat at all; a session-scoped entry either always has one
+  // or never does, so the hook order cannot change under a mounted readout.
+  const readProjection = (useProjection ?? NO_PROJECTION) as ProjectionReader
+  const selection = readProjection('modelSelection')
+  const usage = usageLink(selection?.next?.provider, baseURL)
 
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLButtonElement | null>(null)
@@ -166,6 +199,11 @@ export function BalanceBar({ useStore, t }: BalanceBarProps) {
             <dt>{t('balance.dialog.updated')}</dt>
             <dd>{stampLabel(fetchedAt, t)}</dd>
           </dl>
+          {usage === undefined ? null : (
+            <p {...USAGE_PROPS}>
+              <a href={usage} target="_blank" rel="noreferrer">{t('balance.dialog.usage')}</a>
+            </p>
+          )}
         </div>,
         document.body,
       )}
