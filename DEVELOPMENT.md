@@ -24,6 +24,7 @@ tests/balance-mock.mjs     上游 `/user/balance` 的本地替身
 scripts/release-lab.mjs    隔离 `$DSH_HOME`，逐个验证四种安装方式（见「发布后的四种安装方式」）
 scripts/publish-npm.mjs    发布流水线：六道闸门 + tarball 核查 + 真发布（见「发布到 npm」）
 scripts/shots/verify-settings.mjs  隔离实例里实测设置页与字体选择器（见「本地验证」）
+scripts/shots/verify-compat.mjs    隔离实例里实测插件站在哪些上游接口上（升 dsh 后先跑这个）
 assets/                    README 截图
 ```
 
@@ -174,14 +175,14 @@ Host 半边把 `@deepseek-ai/dsh-brand`、`dsh-credentials`、`schemastery` 等�
 
 ## 版本现实
 
-本插件对齐 **`0.1.5-rc.2`**；`devDependencies` 全部钉死在这个版本上，发布的包也只在这个版本上验证过（`0.1.5-rc.1` 同样验证过，两者对本插件用到的接口无差异）。开发期间确认了四处版本漂移：
+本插件对齐 **`0.1.5-rc.3`**；`devDependencies` 全部钉死在这个版本上，发布的包也只在这个版本上验证过（`0.1.5-rc.1`、`0.1.5-rc.2` 同样验证过）。从 rc.2 升到 rc.3 时逐个比对过：十二个依赖包的 `lib/**`（`.d.ts` 与 `.js`）**逐字节相同**，rc.3 变的不是这些库；插件真正要盯的是随 dsh 发布的**浏览器 shell**（`dsh-client-ui-settings-general` / `-layout` / `-theme` 等），那几个包不在这份 `devDependencies` 里，类型也管不到，只能靠 `scripts/shots/verify-compat.mjs` 在真实例里实测。开发期间确认了四处版本漂移：
 
 1. **`@deepseek-ai/dsh-client-ui-plugin-manager` 只发布了 `0.1.6-alpha.2`。** 那个「插件配置」通用卡片槽位（`plugins.item` / 文档里的 `settings.plugin.item`）是 0.1.6 才有的，0.1.5 的 `ui-settings-plugin-inventory` 只是只读清单页，没有给第三方插件的配置槽位。本插件现在占的是 `settings.section`——0.1.5 就有，官方通用设置 / 模型 / 插件 / Agent 预设四个分区用的是同一个槽；早先只有一行开关与两个字段时占的是 `settings.general.item`，控件多到需要分组之后换成了整页。
 2. **`@deepseek-ai/schemastery` 不用 dsh 的版本号**，它是 `3.18.2`；`@deepseek-ai/cordis` 独立版本化，是 `4.0.2`。
-3. **`conversation.composer.dock` 在 0.1.5 是竖列、0.1.6 才是横排**，余额条与官方 pill 同行靠插件自己的一条规则补上（0.1.5-rc.2 仍是竖列）。
-4. **宽表格补丁绑在上游的悬停切换上。** 0.1.5-rc.2 的悬停态是 `overflow-x: auto`，仓库里的源码已经改成 `overflow-x: scroll`（放得下的表格也常驻条位，于是自绘滚动条路径不再缩，但叠加式滚动条路径照旧）。这两处只要有一处变动——修改 `md-table-wide` 钩子，或上游自己取消悬停切换、让盒子在两种状态下恒定——`tableStylesheet` 就要重新评估是删掉还是改写。
+3. **`conversation.composer.dock` 在 0.1.5 是竖列、0.1.6 才是横排**，余额条与官方 pill 同行靠插件自己的一条规则补上（0.1.5-rc.3 仍是竖列）。rc.3 里两个名字都在：会话插件自己 `inject` + `renderSlot` 的是 `conversation.input.dock`，而 `conversation.composer.dock` 仍作为子槽声明并在 `variant === "composer"` 时渲染——插件注册的是后者，实测仍能挂上。
+4. **宽表格补丁绑在上游的悬停切换上。** 0.1.5-rc.3 的悬停态仍是 `overflow-x: auto`，仓库里的源码已经改成 `overflow-x: scroll`（放得下的表格也常驻条位，于是自绘滚动条路径不再缩，但叠加式滚动条路径照旧）。这两处只要有一处变动——修改 `md-table-wide` 钩子，或上游自己取消悬停切换、让盒子在两种状态下恒定——`tableStylesheet` 就要重新评估是删掉还是改写。
 
-升级 dsh 时这几条都可能变化：改依赖版本、重新 `npm run build`、按需重发一版。改完至少跑一遍 `npm run typecheck`（接口漂移会在类型上暴露）与下面「本地验证」里的一次浏览器实测。
+升级 dsh 时这几条都可能变化。流程：改 `devDependencies` → `npm install` → `npm run typecheck`（接口漂移会在类型上暴露）→ `npm test` → 在**新版本上**跑一遍 `scripts/shots/verify-compat.mjs` 与 `verify-settings.mjs`（shell 的漂移类型管不到，只有实测能看见）→ 按需重发一版。
 
 ## 开发循环
 
@@ -225,6 +226,7 @@ DEEPSEEK_API_KEY=test-key dsh --profile web
 - 面板：`role="dialog"`、300×159、位于读数上方 `874 − 8 − 159 = 707`、左边缘与读数对齐，圆角 12、内边距 16、字号 12/18、背景即 Nord `nord4`；四行明细取值正确；Escape 关闭；等过一个刷新周期后面板仍开着、数值不变而更新时间前进。载体会话用的是 DeepSeek 模型，所以「用量信息」一行在面板里，重拍时面板实测 300×185（`185 = 159 + 18 + 8`，即那一行的行高与上边距），位置随之变成 `874 − 8 − 185 = 681`；这里原先记的 159 是「用量信息」这一行还不存在时的数值。这是条件行，不是回归——同一支探针打在面板上确认过 `[data-dsh-nord-usage]` 存在。
 - 字体选择器（`node scripts/shots/verify-settings.mjs`，隔离实例 + headless Edge 实测）：只写旧五个键的 `cordis.patch.yml` 仍能启动，四个新字段由 schema 默认值补齐，`--dsw-font-family` = Maple Mono 栈、`--ds-font-family-code` = Maple Mono 栈 + `ui-monospace` 等宽回退；界面字体菜单 10 行（跟随系统 + 8 预设 + 自定义…）、代码字体菜单 11 行（多一行「跟随界面字体」）；菜单经 portal 渲染，卡片 218×357 完整落在视口内（`@ 878,531`），未被设置面板的 overflow 裁掉；8 个预设行各自用自己的字体栈渲染，触发按钮用当前生效栈；换界面字体只动 `--dsw-font-family`，换代码字体只动 `--ds-font-family-code`，选「跟随界面字体」后两个 token 相等；从菜单里选「自定义」后在空字段上直接 `Tab` 离开不会改字体（原选择不变、字段收起），而清空一个已经是 `custom` 的字段会提交——空列表解析成尾栈；自定义串 `Arial; } html { --pwn: 1px !important; } :root {` 被整条丢弃——样式表里花括号恰好一对、`--pwn` 计算值为空，token 回落到尾栈；正常串 `'LXGW WenKai', Microsoft YaHei, sans-serif` 按逗号拆开后重新加引号拼装；`settings.yaml` 落盘 `uiFont: custom` / `uiFontCustom` / `codeFont: inherit`；全程无 console 报错。
 - 设置页（`node scripts/shots/verify-settings.mjs`，同一套隔离实例）：左栏实测 `通用设置 | 模型 | 插件 | Agent 预设 | Nord 主题`，本插件一行在官方四个分区之后；点「通用设置」后整屏文本里搜不到 `Nord 配色` / `底部余额条` / `界面字体` / `API 地址`，确认设置已从「通用」搬走；点左栏那一行后 `[data-dsh-nord-settings]` 恰好一个，页面 `<h2>` 是「Nord 主题」、三个 `<h3>` 是「外观 / 字体 / 余额条」，整页 681px 高落在 746px 的内容列里（列不出现纵向滚动），宽 564px 等于列的可用宽度、不撑横向滚动。三个 `role="switch"` 控件尺寸 36×20，右边缘与所在行右边缘齐平；每行标签下是 12/18 的说明文字；两个 `Input` 实宽 98 与 262；点「底部余额条」后 `aria-checked` 转 `false` 且 `settings.yaml` 落盘 `dsh-nord: balanceEnabled: false`，再点回 `true` 同样落盘。字体选择器带来两个 `aria-haspopup="menu"` 的触发按钮（`size="sm"` 的 outline 胶囊，定宽 200px）与按需出现的自定义 `Input`；两个下拉在「替换字体」关掉时一起进入禁用态。
+- 上游接口兼容性（`node scripts/shots/verify-compat.mjs`，隔离实例 + headless Edge，`0.1.5-rc.3` 上实测）：模块加载器在；三枚插件样式表都在（字体规则 412B、余额表面 2367B、宽表格补丁 69B）；`--dsw-font-family` 起于 Maple Mono；主题层两套调色板各抽 9 项 token（alias / static / specific 三层各取代表，含 `faint` 台阶）全部命中 Nord 值；`conversation.composer.dock` 出口的计算值是 `flex`（插件那条 `:has()` 规则生效）、两个子节点是官方 pill 行与余额条，读数 42.50 CNY；明细面板 `role="dialog"`、300×185、四行明细；「用量信息」行渲染出 `https://platform.deepseek.com/usage`（这一行活着就说明 `ui-session` 的 `useProjection('modelSelection')` 座位仍在投递）；Escape 关闭；全程无 console 报错。
 - 设置字段可编辑（同一套隔离实例，键盘实测）：把刷新间隔从 15 改成 90 必须经过中间态 `9`——输入框里依次显示 `9`、`90`，`Tab` 失焦后落盘 `refreshSeconds: 90`；只输入 `9` 再 `Tab` 会弹回 `90`，且不写盘。URL 字段整段换成 `http://127.0.0.1:3099/` 后 `Tab` 落盘 `baseURL`。改成 `defaultValue` + `key` 之前，同一套操作会被 React 还原成原值，字段实际上改不动。
 - 余额轮询不再被无关设置唤醒：空闲 4 秒窗口内 0 次 `/nord/balance`；拨动「Nord 配色」开关关掉再打开，两次点击前后各 0 次（改前每次点击 2 次——一次乐观发布、一次落盘确认各触发一轮重启）。
 - 余额读数在会话切换后仍然刷新（修掉的 bug，复现脚本 `scripts/shots/poll-repro.mjs`：隔离 home + 每次请求把余额 +1 的 mock，所以条上的数字就是读数的新鲜度）。dock 槽位是 session 作用域、store 按会话各建一个实例，而渲染侧把 entry 的 inject 结果按 (entry × 绑定) 缓存——换到别的会话再换回来时 inject 不会重跑。修前实测：留在 A 时 43 → 45 正常，切到 B 后 46 → 48，切回 A 停在 45；随后 40 秒里 mock 又收了 3 次 `/nord/balance`（轮询一直在跑），而 A 始终是 45；再切到 B 显示 51——写的一直是 B 的 store。修后同一条路径：切回 A 直接显示 48，并继续 48 → 51。
