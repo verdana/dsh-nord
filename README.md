@@ -1,5 +1,7 @@
 # dsh-nord
 
+**中文** | [English](https://github.com/verdana/dsh-nord/blob/main/README.en.md)
+
 给 [dsh](https://github.com/deepseek-ai/deepseek-harness) Web GUI 换一套 Nord：Nord 配色、可选字体、一页自己的设置，以及 composer 下方的 DeepSeek 余额读数。
 
 ![Nord 主题（深色）](assets/01-theme.png)
