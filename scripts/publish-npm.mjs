@@ -573,12 +573,15 @@ function createGitTag(version) {
 
 async function smokeTest() {
   step('冒烟：从 registry 装一遍（release-lab）')
-  const args = ['scripts/release-lab.mjs', 'npm', '--registry', opts.registry, '--keep']
+  // --min-release-age 0 不能省：冒烟跑在发布刚成功之后，而 pnpm 11+ 默认有 24 小时
+  // 的新版本冷静期，发布不满一天的版本不进 `@latest` 的候选。不关掉冷静期，这里装到的
+  // 会是上一个版本，却照样报「全部通过」——等于没验这次发布。
+  const args = ['scripts/release-lab.mjs', 'npm', '--registry', opts.registry, '--keep', '--min-release-age', '0']
   info(`$ node ${args.join(' ')}`)
   const result = await run(process.execPath, args, { inherit: true })
   if (result.code !== 0) {
     warn('release-lab 没通过 —— registry 传播可能要等一会儿，或包本身有问题')
-    warn(`手工重试：node scripts/release-lab.mjs npm --registry ${opts.registry}`)
+    warn(`手工重试：node scripts/release-lab.mjs npm --registry ${opts.registry} --min-release-age 0`)
     return
   }
   ok('从 registry 安装、bundle 层、客户端半边全部通过')
