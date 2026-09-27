@@ -30,9 +30,11 @@
 从 npm：
 
 ```sh
-dsh plugin --profile web add dsh-nord
+dsh plugin --profile web add dsh-nord@^0.2.0
 dsh web
 ```
+
+版本写成 `^0.2.0` 这样的范围，而不是让 pnpm 去解 `latest` 标签。原因是 pnpm 11 起默认有 24 小时的「新版本冷静期」：某个版本发布不满一天时，`@latest` 解析不到它，会静默装回上一个版本（刚发版后想立刻验证时很容易踩到）。要装某个确切版本就直接写全，例如 `dsh-nord@0.2.0`。
 
 从本仓库源码：
 

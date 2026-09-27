@@ -53,6 +53,7 @@ const opts = {
   registry: '',
   gitSpec: '',
   spec: '',
+  minReleaseAge: '',
   bootTimeoutMs: 90_000,
 }
 
@@ -65,6 +66,7 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg === '--registry') opts.registry = argv[++i] ?? ''
   else if (arg === '--spec') opts.spec = argv[++i] ?? ''
   else if (arg === '--git') opts.gitSpec = argv[++i] ?? ''
+  else if (arg === '--min-release-age') opts.minReleaseAge = argv[++i] ?? ''
   else if (arg === '--home') opts.home = argv[++i] ?? 'lab'
   else if (arg === '--timeout') opts.bootTimeoutMs = Number(argv[++i] ?? 0) || opts.bootTimeoutMs
   else if (arg === '--help' || arg === '-h') { printHelp(); process.exit(0) }
@@ -92,6 +94,10 @@ function printHelp() {
   --parallel        各方式并行安装
   --registry <url>  npm 方式的 registry，例如 https://registry.npmjs.org/
   --spec <spec>     npm 方式装的 spec（默认 ${PKG_NAME}@latest）
+  --min-release-age <seconds>
+                    覆盖 pnpm 的新版本冷静期（pnpm 11+ 默认 24 小时，即不把「刚发布」
+                    的版本纳入标签解析）。刚发完版时 @latest 会装到上一个版本，
+                    传 0 才是「立刻装到最新版」；也可以改用显式范围 --spec ${PKG_NAME}@^<版本>。
   --git <spec>      git 方式的 spec，默认 github:<repository 或 remote 的 owner/repo>
   --timeout <ms>    启动检查的等待上限（默认 90000）
 
@@ -99,6 +105,8 @@ function printHelp() {
   node scripts/release-lab.mjs                          # 四种方式全跑
   node scripts/release-lab.mjs link tarball             # 发布前彩排（不碰网络）
   node scripts/release-lab.mjs npm --registry https://registry.npmjs.org/
+  node scripts/release-lab.mjs npm --registry https://registry.npmjs.org/ --min-release-age 0
+                                                        # 刚发完版，立刻验证新版
   node scripts/release-lab.mjs git --keep               # 留住现场排查
   node scripts/release-lab.mjs link --no-boot            # 只查装卸，不启服务
 `)
@@ -209,6 +217,98 @@ function allowBuilds(profile, key) {
   writeFileSync(file, `${lines.join('\n')}\n`)
 }
 
+// ── 新版本冷静期 ─────────────────────────────────────────────────────────────
+
+/**
+ * pnpm 11 起默认不把「发布不足 24 小时」的版本纳入标签解析（minimumReleaseAge）。
+ * 于是刚发完版立刻 `add <包名>@latest` 装到的是上一个版本——lab 如果只看
+ * `npm view version`（读的是 latest 标签）就会误报「一致」。这里把冷静期算出来，
+ * 让报告说清楚「pnpm 实际会解析到哪个版本」。
+ * @returns 秒数；显式设为 0 或读不出默认值时返回 null（视为不启用）。
+ */
+function pnpmMinimumReleaseAgeSeconds() {
+  if (opts.minReleaseAge !== '') {
+    const asked = Number(opts.minReleaseAge)
+    return Number.isFinite(asked) && asked > 0 ? asked : null
+  }
+  const asked = spawnSync('pnpm', ['config', 'get', 'minimum-release-age'], { cwd: ROOT, encoding: 'utf8', shell: process.platform === 'win32' })
+  const value = Number((asked.stdout ?? '').trim())
+  if (Number.isFinite(value)) return value > 0 ? value : null
+  // pnpm 不在 `config get` 里报默认值，只能按大版本推断：11 起默认 24 小时。
+  const version = spawnSync('pnpm', ['--version'], { cwd: ROOT, encoding: 'utf8', shell: process.platform === 'win32' })
+  const major = Number(/^(\d+)/.exec((version.stdout ?? '').trim())?.[1] ?? 0)
+  return major >= 11 ? 24 * 3600 : null
+}
+
+/**
+ * 取 registry 上本包的 packument，返回 { latest, versions: [{ version, time }] }。
+ * 刻意不用 `npm view`：那条路读的是 latest 标签，正好绕开我们要检查的东西。
+ */
+async function fetchRegistryVersions(registry) {
+  const base = (registry || 'https://registry.npmjs.org/').replace(/\/+$/, '')
+  const response = await fetch(`${base}/${PKG_NAME}`, { headers: { accept: 'application/json' } })
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  const body = await response.json()
+  const versions = Object.keys(body.versions ?? {}).map((version) => ({
+    version,
+    time: Date.parse(body.time?.[version] ?? '') || 0,
+  }))
+  return { latest: body['dist-tags']?.latest ?? null, versions }
+}
+
+/** semver 的比较只需要「数字段 + 是否预发布」，不引 semver 依赖。 */
+function parseVersion(version) {
+  const [core, prerelease = ''] = version.split('-', 2)
+  return { parts: core.split('.').map(Number), prerelease }
+}
+
+/** a > b 时返回正数。候选里已滤掉预发布，所以这里不需要处理 -beta 这类后缀。 */
+function compareVersions(a, b) {
+  const left = parseVersion(a)
+  const right = parseVersion(b)
+  for (let i = 0; i < 3; i += 1) {
+    const diff = (left.parts[i] ?? 0) - (right.parts[i] ?? 0)
+    if (diff !== 0) return diff
+  }
+  return 0
+}
+
+/**
+ * 报告「标签解析」与「冷静期过滤后实际会装到的版本」的差异。
+ * 只在请求的是标签解析（默认 `@latest`，或只写包名）时才有意义：显式范围
+ * （`^0.2.0`）与精确版本（`0.2.0`）都不受冷静期影响，能直接装到刚发布的版本。
+ */
+async function describeNpmResolution() {
+  const spec = opts.spec || `${PKG_NAME}@latest`
+  const asked = spec.startsWith(`${PKG_NAME}@`) ? spec.slice(PKG_NAME.length + 1) : spec
+  if (asked !== 'latest' && asked !== PKG_NAME) return null
+  let packument
+  try {
+    packument = await fetchRegistryVersions(opts.registry)
+  } catch (error) {
+    return yellow(`拿不到 registry 的版本列表（${error.message}）——跳过冷静期检查`)
+  }
+  const age = pnpmMinimumReleaseAgeSeconds()
+  if (age === null) return null
+  if (packument.latest === null) return null
+
+  const newest = [...packument.versions].sort((a, b) => compareVersions(a.version, b.version)).at(-1) ?? null
+  const newestTime = newest?.time ?? 0
+  const cutoff = Date.now() - age * 1000
+  const eligible = packument.versions
+    .filter((entry) => entry.time !== 0 && entry.time <= cutoff && parseVersion(entry.version).prerelease === '')
+    .map((entry) => entry.version)
+    .sort(compareVersions)
+  const selected = eligible.at(-1) ?? null
+  if (selected === packument.latest) return null
+
+  const ageHours = (age / 3600).toFixed(0)
+  const ageOfNewest = newestTime === 0 ? '' : `（发布 ${((Date.now() - newestTime) / 3_600_000).toFixed(1)} 小时）`
+  return yellow(`冷静期 ${ageHours}h：latest 是 ${packument.latest}${ageOfNewest}，` +
+    `距上个版本不足 ${ageHours} 小时，标签解析会落到 ${selected ?? '（无可用版本）'}；` +
+    `要立刻验证新版请加 --min-release-age 0，或装显式范围 ${PKG_NAME}@^${packument.latest}`)
+}
+
 // ── 各安装方式的 spec ────────────────────────────────────────────────────────
 
 /** 从 package.json 的 repository 字段或 git remote 推 owner/repo，推不出就返回 null。 */
@@ -265,11 +365,17 @@ const METHODS = {
       }
       const published = viewed.stdout.trim()
       const stale = published !== PKG_VERSION && !published.startsWith(`${PKG_VERSION}-`)
-      return stale
-        ? yellow(`registry 上是 ${published}，本地是 ${PKG_VERSION} —— 装到的是已发布版本，不是当前工作树`)
-        : `registry 版本 ${published} 与本地一致`
+      const lines = [
+        stale
+          ? yellow(`registry 上是 ${published}，本地是 ${PKG_VERSION} —— 装到的是已发布版本，不是当前工作树`)
+          : `registry 版本 ${published} 与本地一致`,
+      ]
+      const resolution = await describeNpmResolution()
+      if (resolution !== null) lines.push(resolution)
+      return lines.join('\n   ')
     },
     spec: () => opts.spec || `${PKG_NAME}@latest`,
+    extraArgs: () => (opts.minReleaseAge === '' ? [] : [`--config.minimum-release-age=${opts.minReleaseAge}`]),
     env: () => (opts.registry ? { npm_config_registry: opts.registry } : {}),
     expectDependency: (value) => /^\^?\d/.test(value),
   },
@@ -409,15 +515,16 @@ async function runMethod(method, emit = log) {
     const note = await plan.pre()
     if (note) emit(dim(`   ${note}`))
 
-    emit(dim(`   $ dsh plugin --profile ${plan.profile} add ${plan.spec()}`))
-    let installed = await dsh(['plugin', '--profile', plan.profile, 'add', plan.spec()], { env: plan.env?.() })
+    const addArgs = ['plugin', '--profile', plan.profile, 'add', plan.spec(), ...(plan.extraArgs?.() ?? [])]
+    emit(dim(`   $ dsh ${addArgs.join(' ')}`))
+    let installed = await dsh(addArgs, { env: plan.env?.() })
     if (installed.code !== 0) {
       const key = findAllowBuildsKey(`${installed.stdout}${installed.stderr}`)
       if (key === null) throw new Error(`安装失败:\n${installed.stderr.trim().split('\n').slice(-8).join('\n')}`)
       emit(dim('   pnpm 拦下了 git 包的构建脚本，补 allowBuilds 后重试：'))
       emit(dim(`     ${key}`))
       allowBuilds(plan.profile, key)
-      installed = await dsh(['plugin', '--profile', plan.profile, 'add', plan.spec()], { env: plan.env?.() })
+      installed = await dsh(addArgs, { env: plan.env?.() })
       if (installed.code !== 0) throw new Error(`补过 allowBuilds 后仍失败:\n${installed.stderr.trim().split('\n').slice(-8).join('\n')}`)
     }
     record(true, `安装完成（${(installed.ms / 1000).toFixed(1)}s）`)

@@ -308,6 +308,7 @@ node scripts/release-lab.mjs link tarball             # 用隔离 home 把这两
 node scripts/release-lab.mjs                      # 四种方式全跑（git 首次约 1–2 分钟）
 node scripts/release-lab.mjs link tarball         # 只跑给本地用的两条，完全不碰网络
 node scripts/release-lab.mjs npm --registry https://registry.npmjs.org/
+node scripts/release-lab.mjs npm --registry https://registry.npmjs.org/ --min-release-age 0
 node scripts/release-lab.mjs --keep --no-boot     # 只查装卸，保留现场
 ```
 
@@ -326,13 +327,25 @@ node scripts/release-lab.mjs --keep --no-boot     # 只查装卸，保留现场
 
 第四道是最有价值的一道，也是手工最容易省掉的一道：`--dump-config` 只看得到 Host 半边，客户端半边是否进了 shell 的预载列表，只有把首页抓下来看 `__DSH_BOOT__` 才知道。首页要用启动时打印的 `?token=` 换一次 cookie 才能访问（直接请求 `/` 是 401），脚本跟这一次 303 并带上 cookie。
 
+### 刚发完版，`@latest` 装的不是刚发的版本
+
+pnpm 11 起默认开启新版本冷静期（`minimumReleaseAge`，默认 24 小时）：发布不满一天的版本**不进标签解析的候选**，于是 `add dsh-nord@latest` 会静默装回上一个版本。实测发布 `0.2.0` 后约 8 小时跑 npm 方式，脚本查 registry 得到 `0.2.0`，而 pnpm 解出的 spec 是 `^0.1.1`、装到 `0.1.1`——只看 `npm view version`（读的是 `latest` 标签）会误判成「发布已生效」。
+
+三点要记住：
+
+- 冷静期**只影响标签解析**。显式范围（`@^0.2.0`）和精确版本（`@0.2.0`）都不受它影响，能直接装到刚发布的版本——这也是 npm 方式推荐的写法。
+- 覆盖它的键名是**连字符**的 `--config.minimum-release-age=<秒>`（写进 `pnpm-workspace.yaml` 时是 `minimumReleaseAge`）。camelCase 的 `--config.minimumReleaseAge` 会被**静默忽略**，不报错也不生效；`npm_config_minimum-release-age` 这类环境变量同样不生效。
+- 脚本因此加了一件事：`--min-release-age <秒>` 直接透传给 pnpm（`0` = 关掉冷静期），另外在 npm 方式的输出里算出「冷静期过滤后实际会解析到哪个版本」，与 `latest` 不一致时黄字说明。这条判断不依赖 `pnpm config get`——pnpm 不报这个默认值，脚本按 pnpm 大版本推断（11+ 视为 24 小时）。
+
+因为脚本要连 registry 取版本与发布时间，这条检查会多一次网络请求；拿不到 packument 时只提示「跳过冷静期检查」，不影响其余判定。
+
 各方式实测（本机；npm 那条尚未发布，跑出来是预期的失败）：
 
 | 方式 | profile 里的 spec | 冷启动耗时 | 备注 |
 |---|---|---|---|
 | link | `link:D:/deepseek-harness/dsh-nord` | ~1s | 软链指回工作树，改动落盘即生效 |
-| tarball | `file:…/.release-lab/artifacts/dsh-nord-0.1.0.tgz` | ~1s（`npm pack` 另计） | 走 `prepare` 重新构建，装的是包内真实文件 |
-| npm | `dsh-nord@latest` | 看 registry | 本机 `~/.npmrc` 指向只读镜像，必须 `--registry https://registry.npmjs.org/`；未发布时在 `npm view` 处直接失败 |
+| tarball | `file:…/.release-lab/artifacts/dsh-nord-0.2.0.tgz` | ~1s（`npm pack` 另计） | 走 `prepare` 重新构建，装的是包内真实文件 |
+| npm | `dsh-nord@latest`（默认）或 `dsh-nord@^0.2.0` | 看 registry（带 `--min-release-age 0` 时约 19s） | 本机 `~/.npmrc` 指向只读镜像，必须 `--registry https://registry.npmjs.org/`；未发布时在 `npm view` 处直接失败；刚发完版 `@latest` 会因冷静期装回上一个版本 |
 | git | `github:verdana/dsh-nord` | 首次 ~40s（clone + 装 91 个 devDependency + 构建） | 首次必被 `allowBuilds` 拦下 |
 
 git 那条的 `allowBuilds` 是唯一需要人工介入的地方，脚本替你做掉：`dsh plugin` 失败时 pnpm 会把要粘贴的键值打进错误里（形如 `dsh-nord@https://codeload.github.com/<owner>/<repo>/tar.gz/<sha>: true`），脚本把它抓出来插进该 profile 的 `pnpm-workspace.yaml` 再重试一次。注意 pnpm 会按终端宽度折行，这段文本要**删掉所有空白再匹配**，否则抓不全；插入用文本插入而不是 YAML 重写，注释与缩进原样保留，重复调用幂等。
@@ -340,7 +353,7 @@ git 那条的 `allowBuilds` 是唯一需要人工介入的地方，脚本替你�
 局限说清楚：
 
 - **这里验证的是「装得上、装得对、加载得起来」，不是功能。** 界面、余额、设置项的实测还是 DEVELOPMENT.md 上面「本地验证」那套隔离实例 + headless Edge 的流程。
-- **npm 方式装的是 registry 上的版本，不是当前工作树。** 本地版本与已发布版本不一致时脚本会黄字提示，别把它当成「这次改动已发布」的证据。
+- **npm 方式装的是 registry 上的版本，不是当前工作树。** 本地版本与已发布版本不一致时脚本会黄字提示，别把它当成「这次改动已发布」的证据。刚发完版还要留意上面的冷静期：想立刻验证新版，加 `--min-release-age 0` 或改用 `--spec dsh-nord@^<版本>`。
 - **git 方式不锁定 commit。** 默认用 `github:<owner>/<repo>`（owner/repo 从 `repository` 字段或 `git remote` 推），要复现某个提交请自己给 `--git github:<owner>/<repo>#<sha>`。
 - 每种方式各占一份 `node_modules`（互不共享），`.release-lab` 会到几百 MB 量级；不加 `--keep` 时跑完自动删。
 
