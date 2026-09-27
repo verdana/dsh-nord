@@ -145,6 +145,58 @@ export function BalanceBar({ useStore, t, useProjection }: BalanceBarProps) {
     return () => { document.removeEventListener('keydown', onKeyDown) }
   }, [open])
 
+  /**
+   * Blend the readout into the composer's status row.
+   *
+   * That row belongs to upstream, and its metrics moved between dsh 0.1.5 and
+   * 0.1.7: height 26 → 22, padding-top 4px → 0, font-size 13px → 12px. The fixed
+   * `margin-top` that lined the readout up on 0.1.5 therefore leaves it a point
+   * large and a pixel low on 0.1.7 — measured, not guessed: 0.0px of first-line
+   * difference on 0.1.5 against 1.0px on 0.1.7. Rather than key either number off
+   * a version, take them from the sibling's own first line: adopt its font
+   * metrics, then cancel whatever offset is left. That is what aligning it by eye
+   * amounts to, and it survives the next redesign of the row.
+   */
+  useEffect(() => {
+    const bar = rootRef.current
+    const row = bar?.parentElement
+    if (bar === null || row === undefined || row === null) return undefined
+
+    /** The first line box of an element's first non-empty text run. */
+    const firstLine = (element: Element): DOMRect | null => {
+      const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT)
+      for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
+        if ((node.textContent ?? '').trim() === '') continue
+        const range = document.createRange()
+        range.selectNodeContents(node)
+        const rect = range.getBoundingClientRect()
+        if (rect.height > 0) return rect
+      }
+      return null
+    }
+
+    const align = (): void => {
+      // The row's other occupant is the stats readout; with none, the CSS stands.
+      const sibling = [...row.children].find((child) => child !== bar)
+      if (sibling === undefined) return
+      const metrics = getComputedStyle(sibling)
+      bar.style.fontSize = metrics.fontSize
+      bar.style.lineHeight = metrics.lineHeight
+      const target = firstLine(sibling)
+      const mine = firstLine(bar)
+      if (target === null || mine === null) return
+      const current = Number.parseFloat(getComputedStyle(bar).marginTop) || 0
+      const next = Math.round((current + (target.top - mine.top)) * 2) / 2
+      // Half-pixel guard: re-aligning must not chase its own output.
+      if (Math.abs(next - current) >= 0.5) bar.style.marginTop = `${next}px`
+    }
+
+    align()
+    const observer = new ResizeObserver(align)
+    observer.observe(row)
+    return () => { observer.disconnect() }
+  }, [phase])
+
   // `idle` is both the initial state and the state a disabled readout clears to.
   if (phase === 'idle') return null
   if (phase !== 'ready') {

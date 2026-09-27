@@ -294,6 +294,13 @@ export function surfaceStylesheet(): string {
     `[${PANEL_ATTR}]{position:fixed;z-index:1100;box-sizing:border-box;width:max-content;`
     + 'min-width:min(300px,calc(100vw - 24px));max-width:min(440px,calc(100vw - 24px));padding:16px;'
     + 'border:0;border-radius:12px;background:var(--dsw-specific-menu);'
+    // Upstream floats a popover on a PAIR of declarations: the menu fill plus its
+    // frost. In 0.1.7 the fill became translucent (`#43454a73`) and the frost moved
+    // into `--dsw-menu-backdrop-filter` (`blur(40px) saturate(150%)`) — copying the
+    // fill alone is what made this panel read as merely see-through. The token does
+    // not exist on 0.1.5, where the fill is opaque and the declaration falls back to
+    // its initial `none`, i.e. exactly what that version rendered before.
+    + 'backdrop-filter:var(--dsw-menu-backdrop-filter);'
     + '--dsw-elevation-stroke-color:var(--dsw-alias-border-l1);box-shadow:var(--dsw-elevation-prominent);'
     + 'font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary);cursor:default;}',
     `[${PANEL_ATTR}] > header{display:flex;justify-content:space-between;gap:16px;margin-bottom:8px;`
