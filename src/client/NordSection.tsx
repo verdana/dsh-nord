@@ -21,7 +21,9 @@
  * re-seeds a field when the stored value lands or changes underneath it.
  */
 import { useState } from 'react'
-import { Button, IconChevronDownOutline14, Input, Menu, Switch } from '@deepseek-ai/dsh-client-ui-primitives'
+import type { ComponentType } from 'react'
+import * as primitives from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, Input, Menu, Switch } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { MenuEntry } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime, PropsStore } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
@@ -29,6 +31,33 @@ import { CUSTOM_FONT, FONT_PRESETS, fontStacks, INHERIT_FONT, isPreset, presetPr
 import type { NordKey } from './locales.ts'
 import { SETTINGS_ATTR } from './nord.ts'
 import type { createNordSettingsStore } from './stores.ts'
+
+/** Geometry of the caret drawn when the host ships neither icon name below. */
+const CARET_SIZE = 14
+
+/**
+ * The menu trigger's caret.
+ *
+ * ui-primitives renamed its entire icon set between dsh 0.1.5 and 0.1.7: every
+ * size-suffixed export lost its suffix (`IconChevronDownOutline14` →
+ * `IconChevronDownOutline`), and the artwork was redrawn — the 0.1.5 shape is a
+ * fill on a 14-unit viewBox, the 0.1.7 one a 1px stroke on a 16-unit viewBox.
+ * **No single name renders on both**, so resolve whichever this host ships and
+ * keep each version's own drawing.
+ *
+ * The last resort is a copy of the newer artwork rather than nothing: importing
+ * a name the host does not export yields `undefined`, and passing that as a
+ * component type is React error #130 — which takes the whole settings page down
+ * with it. A cosmetic caret is not worth that.
+ */
+const CaretDown: ComponentType<{ size?: number; className?: string }> =
+  (primitives as unknown as Record<string, ComponentType<{ size?: number; className?: string }> | undefined>).IconChevronDownOutline
+  ?? (primitives as unknown as Record<string, ComponentType<{ size?: number; className?: string }> | undefined>).IconChevronDownOutline14
+  ?? (() => (
+    <svg width={CARET_SIZE} height={CARET_SIZE} viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M4 6L7.29289 9.29289C7.68342 9.68342 8.31658 9.68342 8.70711 9.29289L12 6" stroke="currentColor" strokeWidth={1} />
+    </svg>
+  ))
 
 /** Injected business face: one durable field write. */
 export interface NordSectionInjected {
@@ -281,7 +310,7 @@ function FontRow({
             onClick={() => { setOpen(!open) }}
           >
             <span style={{ ...FONT_TRIGGER_LABEL, fontFamily: stack }}>{triggerText}</span>
-            <span style={FONT_CARET_STYLE}><IconChevronDownOutline14 /></span>
+            <span style={FONT_CARET_STYLE}><CaretDown /></span>
           </Button>
         )}
       />

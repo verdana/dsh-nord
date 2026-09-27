@@ -11,9 +11,8 @@
  * profile 的 patch 故意只写旧有的五个键：`cordis.patch.yml` 是整段替换 `config`，
  * 所以这一条同时验证新字段的 `.default()` 能不能把旧文档补全。
  */
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { writeFileSync } from 'node:fs'
 import { FONT_PRESETS, presetPreview } from '../../lib/fonts.js'
 import {
   dismissWelcome, ensureProfile, HOME, openPage, prepareHome, ROOT, sleep, startServer, stopServer,
@@ -186,6 +185,10 @@ try {
   ok('菜单完整落在视口内', `${Math.round(menuBox.w)}×${Math.round(menuBox.h)} @ ${Math.round(menuBox.x)},${Math.round(menuBox.y)}`)
 
   await pick('JetBrains Mono')
+  // Wait for the outcome, not for a fixed delay: dsh 0.1.5 publishes the write
+  // optimistically, 0.1.7 publishes only after the Host settles it, so the same
+  // click lands at different moments on the two generations.
+  await waitFor(page, '界面字体落到 JetBrains Mono', async () => (await page.evaluate(tokens)).ui.startsWith("'JetBrains Mono'"))
   const jetbrains = await page.evaluate(tokens)
   if (!jetbrains.ui.startsWith("'JetBrains Mono'")) throw new Error(`换成 JetBrains Mono 没生效：${jetbrains.ui}`)
   if (jetbrains.code !== initial.code) throw new Error('改界面字体不该动到代码字体')
@@ -196,6 +199,7 @@ try {
   ok('代码字体菜单行数', codeRows.length)
   if (!codeRows.includes('跟随界面字体')) throw new Error('代码字体菜单缺「跟随界面字体」')
   await pick('Cascadia Code')
+  await waitFor(page, '代码字体落到 Cascadia Code', async () => (await page.evaluate(tokens)).code.startsWith("'Cascadia Code'"))
   const cascadia = await page.evaluate(tokens)
   if (!cascadia.code.startsWith("'Cascadia Code'")) throw new Error(`换成 Cascadia Code 没生效：${cascadia.code}`)
   if (cascadia.ui !== jetbrains.ui) throw new Error('改代码字体不该动到界面字体')
@@ -203,6 +207,10 @@ try {
 
   await openFontMenu('代码字体')
   await pick('跟随界面字体')
+  await waitFor(page, '代码字体跟随界面字体', async () => {
+    const now = await page.evaluate(tokens)
+    return now.code === now.ui
+  })
   const inherited = await page.evaluate(tokens)
   if (inherited.code !== inherited.ui) throw new Error('「跟随界面字体」没有把两个 token 对齐')
   ok('代码字体 → 跟随界面字体', inherited.code.slice(0, 40) + '…')
@@ -241,7 +249,10 @@ try {
   // ── 自定义：正常串生效 ─────────────────────────────────────────────────
   await field.fill("'LXGW WenKai', Microsoft YaHei, sans-serif")
   await page.keyboard.press('Tab')
-  await sleep(1200)
+  // Submitting a custom stack is TWO serialized writes (the raw field, then the
+  // choice that activates it), and on 0.1.7 each settles over the wire before
+  // publishing — so wait for the outcome rather than for a fixed delay.
+  await waitFor(page, '自定义串生效', async () => (await page.evaluate(tokens)).ui.startsWith("'LXGW WenKai', 'Microsoft YaHei', sans-serif"))
   const custom = await page.evaluate(tokens)
   if (!custom.ui.startsWith("'LXGW WenKai', 'Microsoft YaHei', sans-serif")) {
     throw new Error(`自定义串没按预期拼装：${custom.ui}`)
@@ -249,18 +260,32 @@ try {
   ok('自定义串生效', custom.ui)
 
   // ── 落盘 ───────────────────────────────────────────────────────────────
-  const stored = readFileSync(join(HOME, 'settings.yaml'), 'utf8')
-  const section = stored.slice(stored.indexOf('dsh-nord:')).split('\n').slice(0, 8).join('\n')
-  console.log('\n=== settings.yaml ===')
+  // Which document holds a plugin's settings moved between generations: dsh
+  // 0.1.5 writes a `settings.yaml` section, 0.1.7 dropped that file and folds
+  // every preference into the active profile's `cordis.patch.yml`. Read
+  // whichever this instance actually keeps, and report which one it was.
+  const documents = [
+    ['settings.yaml', join(HOME, 'settings.yaml')],
+    ['cordis.patch.yml', join(HOME, 'profiles', PROFILE, 'cordis.patch.yml')],
+  ].filter(([, path]) => existsSync(path))
+  if (documents.length === 0) throw new Error('既没有 settings.yaml 也没有 profile patch，设置没落到任何地方')
+  const stored = documents.map(([, path]) => readFileSync(path, 'utf8')).join('\n')
+  const section = stored.slice(stored.indexOf('dsh-nord:') === -1 ? 0 : stored.indexOf('dsh-nord:')).split('\n').slice(0, 10).join('\n')
+  console.log(`\n=== ${documents.map(([name]) => name).join(' + ')} ===`)
   console.log(section)
   for (const expected of ['uiFont: custom', 'codeFont: inherit', 'uiFontCustom:']) {
-    if (!stored.includes(expected)) throw new Error(`settings.yaml 缺少 ${expected}`)
+    if (!stored.includes(expected)) throw new Error(`${documents.map(([name]) => name).join(' + ')} 里缺少 ${expected}`)
   }
-  ok('落盘字段', 'uiFont / uiFontCustom / codeFont')
+  ok('落盘字段', `uiFont / uiFontCustom / codeFont → ${documents.map(([name]) => name).join(' + ')}`)
 
   if (problems.length > 0) throw new Error(`页面报错：\n${problems.join('\n')}`)
   ok('页面无 console 报错', problems.length)
   console.log('\n全部通过')
+} catch (error) {
+  // 「无 console 报错」那道闸在最后，前面任何一道先炸就看不到浏览器说了什么 ——
+  // 而换 dsh 版本时，报错原文正是最该看的东西。
+  if (problems?.length) console.error(`\n浏览器报错（${problems.length}）：\n${problems.join('\n')}`)
+  throw error
 } finally {
   await browser?.close()
   await stopServer(server)

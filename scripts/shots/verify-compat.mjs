@@ -15,7 +15,7 @@ import { readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import {
-  createBalanceMock, dismissWelcome, ensureProfile, HOME, openPage, prepareHome, ROOT, sleep,
+  createBalanceMock, dismissWelcome, dshVersion, ensureProfile, HOME, openPage, prepareHome, ROOT, sleep,
   startServer, stopServer, writeBalancePatch,
 } from './lab.mjs'
 
@@ -95,6 +95,10 @@ writeBalancePatch()
 const mock = await createBalanceMock()
 const server = await startServer({ workspace: ROOT })
 
+// 先亮明这一轮测的是哪一对版本：探针半路炸掉时，报告里也得看得出跑的是哪个 dsh。
+const pluginVersion = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version
+console.log(`dsh ${await dshVersion()} × dsh-nord ${pluginVersion}\n`)
+
 let browser, page, problems
 try {
   ;({ browser, page, problems } = await openPage(server.url))
@@ -109,7 +113,7 @@ try {
     tables: document.querySelector('#dsh-nord-tables')?.textContent ?? '',
   }))
   if (!sheets.fonts.includes('--dsw-font-family') || !sheets.fonts.includes('--ds-font-family-code')) {
-    throw new Error(`字体规则不对：${sheets.fonts}`)
+    throw new Error(`字体规则不对（字体 ${sheets.fonts.length}B / 表面 ${sheets.surfaces}B / 宽表格 ${sheets.tables.length}B）：${sheets.fonts.slice(0, 400)}`)
   }
   if (sheets.surfaces < 500) throw new Error(`余额表面样式表缺失或过短：${sheets.surfaces}`)
   if (!sheets.tables.includes('.md-table-wide')) throw new Error(`宽表格补丁缺失：${sheets.tables}`)
@@ -168,6 +172,12 @@ try {
   await page.locator('button[data-dsh-nord-bar]').first().click()
   await waitFor(page, '余额明细面板', () => page.evaluate(() =>
     document.querySelector('[data-dsh-nord-panel]') !== null))
+  // The 「用量信息」 row is conditional on the Session's model-selection
+  // projection, which arrives on its own schedule — the panel is up before it
+  // lands, so wait for the row instead of reading the panel the instant it
+  // appears. A seat that has genuinely gone away still fails, just later.
+  await waitFor(page, '「用量信息」行', () => page.evaluate(() =>
+    document.querySelector('[data-dsh-nord-usage] a') !== null))
   const panel = await page.evaluate(() => {
     const el = document.querySelector('[data-dsh-nord-panel]')
     const r = el.getBoundingClientRect()
@@ -199,6 +209,11 @@ try {
 
   const version = readFileSync(join(ROOT, 'package.json'), 'utf8').match(/"version": "([^"]+)"/)?.[1]
   console.log(`\n全部通过（dsh-nord ${version}）`)
+} catch (error) {
+  // 「无 console 报错」那道闸在最后，前面任何一道先炸就看不到浏览器说了什么 ——
+  // 而换 dsh 版本时，报错原文正是最该看的东西。
+  if (problems?.length) console.error(`\n浏览器报错（${problems.length}）：\n${problems.join('\n')}`)
+  throw error
 } finally {
   await browser?.close()
   await stopServer(server)

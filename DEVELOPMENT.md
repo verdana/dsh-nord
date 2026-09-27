@@ -12,6 +12,7 @@ src/balance.ts             余额载荷类型，以及上游文档到载荷的�
 src/usage.ts               用量信息链接的判定：会话模型供应商优先，余额地址兜底
 src/fonts.ts               字体预设目录，以及「存储选项 → CSS 家族列表」的解析（含自定义串的清洗）
 src/client/index.ts        浏览器半边：主题层、字体、样式表、设置页、余额轮询、两个 slot 注册
+src/client/settings.ts     设置传输的跨代适配：settingsScope（0.1.5）与 configForms（0.1.7）归一到一个接口
 src/client/nord.ts         Nord 调色板（116 token）、字体 `:root` 规则、余额表面与宽表格补丁的 CSS
 src/client/BalanceBar.tsx  余额读数与其明细面板
 src/client/NordSection.tsx 设置面板里本插件自己的一页
@@ -23,6 +24,7 @@ tests/fonts.test.mjs       字体解析与自定义串清洗的 `node --test` �
 tests/balance-mock.mjs     上游 `/user/balance` 的本地替身
 scripts/release-lab.mjs    隔离 `$DSH_HOME`，逐个验证四种安装方式（见「发布后的四种安装方式」）
 scripts/publish-npm.mjs    发布流水线：六道闸门 + tarball 核查 + 真发布（见「发布到 npm」）
+scripts/dsh-version-lab.mjs  并排装另一个 dsh 版本（装在仓库外），供 `DSH_BIN` 指过去（见「版本现实」）
 scripts/shots/verify-settings.mjs  隔离实例里实测设置页与字体选择器（见「本地验证」）
 scripts/shots/verify-compat.mjs    隔离实例里实测插件站在哪些上游接口上（升 dsh 后先跑这个）
 assets/                    README 截图
@@ -39,7 +41,7 @@ assets/                    README 截图
 | 余额 | Host 侧 `webServer` 上的 `GET /nord/balance`，用 `ctx.credentials` 解析 `DEEPSEEK_API_KEY`；浏览器侧是 dock 里一枚可点击读数 + 明细面板 |
 | 余额投影 | `src/balance.ts` 的 `parseBalance()`：上游文档 → 载荷，Host 路由与 `npm test` 共用同一份实现 |
 | 用量信息链接 | `src/usage.ts` 的 `usageLink()`：会话模型供应商（Host 的 `modelSelection` 投影）优先，取不到时看余额地址域名；非 DeepSeek 账号面板不变 |
-| 设置项 | Host `ctx.settings.installSection()` 持久化进 `settings.yaml`；浏览器侧是左栏一页 `settings.section`（`id: dsh-nord`、`order: 40`） |
+| 设置项 | 两代机制不同：0.1.5 由 Host `ctx.settings.installSection()` 把命名空间持久化进 `settings.yaml`，0.1.7 由 Loader 从条目导出的 `Config` 自动派生表单、写进 profile 的 `cordis.patch.yml`；浏览器侧两代都是左栏一页 `settings.section`（`id: dsh-nord`、`order: 40`） |
 | 设置页控件 | 模块表基线里的 `@deepseek-ai/dsh-client-ui-primitives`：开关用 `Switch`、字体选择用 `Menu`、字段用 `Input`，行距与配色走内联 style |
 | 余额表面的样式 | 插件自己的一枚 `<style>`（`surfaceStylesheet`）：dock 行规则、读数皮肤、面板皮肤 |
 | 宽表格抖动补丁 | 第三枚 `<style>`（`tableStylesheet`）：把 `md-table-wide` 钉在 `overflow-x:auto` 且无底部预留，取消上游的悬停切换 |
@@ -175,14 +177,75 @@ Host 半边把 `@deepseek-ai/dsh-brand`、`dsh-credentials`、`schemastery` 等�
 
 ## 版本现实
 
-本插件对齐 **`0.1.5-rc.3`**；`devDependencies` 全部钉死在这个版本上，发布的包也只在这个版本上验证过（`0.1.5-rc.1`、`0.1.5-rc.2` 同样验证过）。从 rc.2 升到 rc.3 时逐个比对过：十二个依赖包的 `lib/**`（`.d.ts` 与 `.js`）**逐字节相同**，rc.3 变的不是这些库；插件真正要盯的是随 dsh 发布的**浏览器 shell**（`dsh-client-ui-settings-general` / `-layout` / `-theme` 等），那几个包不在这份 `devDependencies` 里，类型也管不到，只能靠 `scripts/shots/verify-compat.mjs` 在真实例里实测。开发期间确认了四处版本漂移：
+本插件对齐 **`0.1.5-rc.3`**，并**同时支持 `0.1.7-rc.2`**；`devDependencies` 钉在 0.1.5-rc.3 上（`schemastery` 除外，见第 5 条），两代都由 `verify-compat` 与 `verify-settings` 实测过。从 rc.2 升到 rc.3 时逐个比对过：十二个依赖包的 `lib/**`（`.d.ts` 与 `.js`）**逐字节相同**，rc.3 变的不是这些库；插件真正要盯的是随 dsh 发布的**浏览器 shell**（`dsh-client-ui-settings-general` / `-layout` / `-theme` 等），那几个包不在这份 `devDependencies` 里，类型也管不到，只能靠 `scripts/shots/verify-compat.mjs` 在真实例里实测。开发期间确认了五处版本漂移：
 
 1. **`@deepseek-ai/dsh-client-ui-plugin-manager` 只发布了 `0.1.6-alpha.2`。** 那个「插件配置」通用卡片槽位（`plugins.item` / 文档里的 `settings.plugin.item`）是 0.1.6 才有的，0.1.5 的 `ui-settings-plugin-inventory` 只是只读清单页，没有给第三方插件的配置槽位。本插件现在占的是 `settings.section`——0.1.5 就有，官方通用设置 / 模型 / 插件 / Agent 预设四个分区用的是同一个槽；早先只有一行开关与两个字段时占的是 `settings.general.item`，控件多到需要分组之后换成了整页。
-2. **`@deepseek-ai/schemastery` 不用 dsh 的版本号**，它是 `3.18.2`；`@deepseek-ai/cordis` 独立版本化，是 `4.0.2`。
-3. **`conversation.composer.dock` 在 0.1.5 是竖列、0.1.6 才是横排**，余额条与官方 pill 同行靠插件自己的一条规则补上（0.1.5-rc.3 仍是竖列）。rc.3 里两个名字都在：会话插件自己 `inject` + `renderSlot` 的是 `conversation.input.dock`，而 `conversation.composer.dock` 仍作为子槽声明并在 `variant === "composer"` 时渲染——插件注册的是后者，实测仍能挂上。
+2. **`@deepseek-ai/cordis` 独立版本化**（0.1.5 是 `4.0.2`，0.1.7 是 `4.0.4`）。
+3. **`conversation.composer.dock` 在 0.1.5 是竖列、0.1.6 才是横排**，余额条与官方 pill 同行靠插件自己的一条规则补上（0.1.5-rc.3 仍是竖列）。rc.3 里两个名字都在：会话插件自己 `inject` + `renderSlot` 的是 `conversation.input.dock`，而 `conversation.composer.dock` 仍作为子槽声明并在 `variant === "composer"` 时渲染——插件注册的是后者，实测仍能挂上。0.1.7 上出口只剩余额条一个子节点（官方那枚统计 pill 不在 dock 里了），槽位本身照旧，`verify-compat` 的断言不受影响。
 4. **宽表格补丁绑在上游的悬停切换上。** 0.1.5-rc.3 的悬停态仍是 `overflow-x: auto`，仓库里的源码已经改成 `overflow-x: scroll`（放得下的表格也常驻条位，于是自绘滚动条路径不再缩，但叠加式滚动条路径照旧）。这两处只要有一处变动——修改 `md-table-wide` 钩子，或上游自己取消悬停切换、让盒子在两种状态下恒定——`tableStylesheet` 就要重新评估是删掉还是改写。
+5. **`@deepseek-ai/schemastery` 不用 dsh 的版本号**，而且从 0.1.5 的 `3.18.2` 升到了 0.1.7 的 `3.18.4`——`.volatile()` 是 3.18.4 才有的方法，本插件的 schema 需要它（见下）。devDependency 因此钉在 `3.18.4`，实际打进 `lib/index.js` 的是它。
 
 升级 dsh 时这几条都可能变化。流程：改 `devDependencies` → `npm install` → `npm run typecheck`（接口漂移会在类型上暴露）→ `npm test` → 在**新版本上**跑一遍 `scripts/shots/verify-compat.mjs` 与 `verify-settings.mjs`（shell 的漂移类型管不到，只有实测能看见）→ 按需重发一版。
+
+### 并排装另一个 dsh 版本
+
+npm 的 `latest` 标签与 GitHub 上的最新版常常不是一回事（`0.1.5-rc.3` 是 `latest`，`0.1.7-rc.2` 挂在 `next` 上），所以「本插件在最新版上还能不能跑」要拿另一个版本来问，而不是升级全局那份：
+
+```sh
+node scripts/dsh-version-lab.mjs 0.1.7-rc.2                 # 装到 ~/.dsh-versions/0.1.7-rc.2
+node scripts/dsh-version-lab.mjs --list
+node scripts/dsh-version-lab.mjs 0.1.7-rc.2 -- node scripts/shots/verify-compat.mjs
+node scripts/dsh-version-lab.mjs 0.1.7-rc.2 -- node scripts/shots/verify-settings.mjs
+node scripts/dsh-version-lab.mjs 0.1.7-rc.2 -- node scripts/release-lab.mjs link
+```
+
+**必须装在仓库外。** `pnpm add` 会顺着 `pnpm-workspace.yaml` 往上找到仓库根，把整棵新版本的依赖树链接进本仓库的 `node_modules` 并重解析 `pnpm-lock.yaml`（传递依赖按 caret 往上跳）——类型基线当场就变了，实测 `npm run typecheck` 会因为 cosmokit 从 `1.8.3` 跳到 `1.8.5` 报 `TS2375`。`scripts/dsh-version-lab.mjs` 因此固定在 `~/.dsh-versions/<版本>/`，并在那里放一份自己的 `pnpm-workspace.yaml` 把向上查找止住；清场用 `npm ci`（`package-lock.json` 是唯一入库的那份，`pnpm-lock.yaml` 是本地产物）。
+
+两个 dsh 同时在跑靠两件事分开：`DSH_HOME` 与端口。本机那份 GUI 是 `DSH_HOME=~/.dsh` + 3080；并排那份换个 home 与端口即可，profile、会话、凭据各归各的：
+
+```powershell
+$env:DSH_HOME = "$env:USERPROFILE\.dsh-0.1.7-rc.2"
+& "$env:USERPROFILE\.dsh-versions\0.1.7-rc.2\node_modules\.bin\dsh.cmd" --port 3180
+```
+
+探针一侧只认一个环境变量：`DSH_BIN`（`scripts/shots/lab.mjs` 与 `scripts/release-lab.mjs` 都读它，默认仍是 PATH 上的 `dsh`）。两个探针开场都会写明这次打的是哪一对版本。
+
+### `0.1.7-rc.2` 支持：设置的两半各断了一次
+
+2026-09-27 把它跑通。0.1.7 把**整个客户端包集**从 `0.1.5-rc.3` 提到了 `0.1.7-rc.2`（`dsh-client-ui-settings` / `-theme` / `-conversation` / `-slots` / `-store` / `-locale` 全部换版），浏览器半边与 Host 半边各断在一处，两处都已修好，方法是**按运行时形状分流**而不是按版本号判断。
+
+**一、客户端：`settingsScope` 改名成了 `configForms`。** 原来 `inject` 里挂着 `settingsScope`，0.1.7 整个安装里 grep 它是零命中，于是 shell 报：
+
+```
+Error: web boot: 1 entry did not activate
+dsh-nord: pending (waiting for service: settingsScope)
+```
+
+入口的 `inject` 是硬激活闸——列了两个名字就会卡在缺的那个上，列一个就会断另一边。所以两者都不进 `inject`：`src/client/settings.ts` 用两次 `ctx.inject` 分别等 `configForms` 与 `settingsScope`，谁先到就用谁，并把两边归一到同一个 `SettingsTransport` 接口。改名其实很浅：`settingsScope.bind({ namespace })` 与 `configForms.get(entryId)` 是同一个控制器（后者的实现就是 `new ConfigFormController(owner, { namespace: entryId }, …)`），`ConfigFormSnapshot` 与 `SettingsScopeSnapshot` 逐字段相同，只有写方法的结算不同——0.1.5 是 `Promise<void>`（拒绝即失败），0.1.7 是 `Promise<boolean>`。0.1.7 那个布尔**故意被忽略**：它对新旧写都是 `false`，且控制器无论如何都会把 Host 的状态折回来，照着它报错会让每次连续编辑都闪一条假失败。
+
+`settings.section` 的注册契约不用动，这点值得记下来免得下次白改：`InjectParams` 两代完全相同（根作用域带 store 就是 `[actions]`，**没有** owner props），`SlotLabel` 两代都接受字符串或 thunk，`locale` 选项也还在。
+
+**二、Host：`installSection` 被删掉了。** 0.1.7 的 `@deepseek-ai/dsh-settings` 换成了 `configure` / `describe` / `update` / `replace` / `mutate`，表单由 Loader 条目的 `Config` **自动派生**，键就是 profile 条目 id（`cordis.patch.yml` 里那行 `id: dsh-nord`，与 `NS` 同值）。链路是：
+
+```
+describe() → configEditor.configuration()
+           → schema(entry) = entry.fiber.runtime.Config     # 本模块导出的 Config
+           → volatileForm(schema)                           # 只保留带 meta.volatile 的字段
+           → form === undefined 就把整个条目丢掉
+```
+
+所以 **schema 里必须至少有一个 `.volatile()` 字段**，否则命名空间根本不出现在 `describe()` 里，浏览器看到的是 `unavailable`。官方那批自带设置页的插件都同时调 `settings.configure({ auto: false }, ctx.fiber)`——`auto` 只走 wire，当前没有任何客户端消费它，所以不会真的多出一页，但这是官方写法，照做。实时值的读法也变了：0.1.7 把 volatile 字段解析成带 `.get()` 的 `Volatile<T>` 包装（`config.preference.get()`），而 `fiber.config` 的对象标识在 volatile 提交时不换，所以闭包住 `config` 再逐个 `.get()` 就是实时的。
+
+**三、`.volatile()` 在 0.1.5 上不是惰性的——这是最费时间的一处。** 两代因此拿到**两个 schema**（`Config` 带标记给 0.1.7 发现用，`PlainConfig` 不带给 0.1.5 注册用），由 `src/schema.ts` 里同一张字段表构建。两个反直觉的坑：
+
+- **0.1.5 的 `describe()` 里有 `structuredClone(registration.base)`。** 传 `config` 进去而它带着 `Volatile` 包装（包装里有函数）会抛 `DataCloneError`，整个命名空间列表变空，浏览器报 `unavailable`，服务端一声不响。所以 base 必须传解包后的快照。
+- **0.1.5 会把注册用的 schema 解析结果直接当 wire 值。** 带标记的 schema 在那里把每个字段解析成 `{ get() {} }` 空壳，JSON 一过就没了，浏览器校验不过静默丢弃——**写入照常落盘，界面永远不动**。这类症状（落盘了但读不回来）先看 schema，不要先怀疑传输。
+
+**四、图标名字整组换了。** ui-primitives 在 0.1.7 把尺寸后缀去掉了（`IconChevronDownOutline14` → `IconChevronDownOutline`），而且**两代没有共同名字，图形也重画过**（0.1.5 是 14 单位 viewBox 的填充路径，0.1.7 是 16 单位、1px 描边）。`NordSection` 因此按宿主实际导出的名字解析 caret，并留一份 0.1.7 图形的本地兜底：把一个不存在的名字当组件类型传进去是 React #130，会把整页设置面板一起带下去，一个装饰性 caret 不值得这个代价。
+
+这些漂移在类型层面全都看不见：`lib/client.js` 只把 shell 模块表里的五个 specifier 留作 external，`devDependencies` 又钉在 0.1.5-rc.3 上——`npm run typecheck` 照过。只有实跑能看见，这正是上面那条流程最后一步存在的原因。
+
+**两代实测结果**（`dsh-version-lab.mjs 0.1.7-rc.2 -- …`）：`verify-compat` 10/10、`verify-settings` 全过、零 console 报错；`release-lab` 四种安装方式全 PASS。0.1.7 的 dock 出口只剩余额条一个子节点（官方统计 pill 不在 dock 里了），其余断言两代一致。
 
 ## 开发循环
 
@@ -215,7 +278,7 @@ DEEPSEEK_API_KEY=test-key dsh --profile web
 
 已经验证过的内容：
 
-- `npm run typecheck`、`npm run build` 通过；`lib/client.js` 只把模块表里的 specifier 留作 external，其余内联，banner/intro/footer 符合 `__ModuleLoader__.load({ id: "dsh-nord", … })` 契约并导出 `apply` / `inject`；产物 66.02 kB（gzip 18.76 kB）。其中拆出 `src/schema.ts` 省下的正是内联的 schemastery 与 cosmokit（70.66 → 42.26 kB）；字体选择器与独立设置页把它推回 66.02 kB，因为这一版新引了官方 `Menu` 与 `Button`（连同它们的 CSS Module 与图标），外加 `src/fonts.ts` 的预设目录与清洗逻辑。Node 半边四个产物：`lib/index.js` 36.62 kB、`lib/fonts.js` 8.19 kB、`lib/usage.js` 1.88 kB、`lib/balance.js` 1.19 kB。
+- `npm run typecheck`、`npm run build` 通过；`lib/client.js` 只把模块表里的 specifier 留作 external，其余内联，banner/intro/footer 符合 `__ModuleLoader__.load({ id: "dsh-nord", … })` 契约并导出 `apply` / `inject`；产物 71.48 kB（gzip 20.55 kB）。其中拆出 `src/schema.ts` 省下的正是内联的 schemastery 与 cosmokit（70.66 → 42.26 kB）；字体选择器与独立设置页把它推回 66.02 kB，因为这一版新引了官方 `Menu` 与 `Button`（连同它们的 CSS Module 与图标），外加 `src/fonts.ts` 的预设目录与清洗逻辑；跨代适配又加了 5.46 kB（0.1.7 的设置传输协商、按宿主解析的 caret、`resolved()` 解包），其中 `lib/client.js` 从 66.02 → 71.48 kB、`lib/index.js` 从 36.62 → 44.24 kB（后者大半是 schemastery 3.18.2 → 3.18.4 与第二份非 volatile schema）。Node 半边四个产物：`lib/index.js` 44.24 kB、`lib/fonts.js` 8.19 kB、`lib/usage.js` 1.88 kB、`lib/balance.js` 1.19 kB。
 - `npm test` 通过：`tests/balance.test.mjs` 的 8 条规格跑在构建产物 `lib/balance.js` 上，覆盖正常字段、多币种取首条、`is_available` 缺失或为 `false`、条目字段缺失回退、数值型余额、非字符串 `currency`，以及 `balance_infos` 缺失 / 空数组 / 非数组 / 首项非对象都归到 `malformed-response`；`tests/fonts.test.mjs` 的 17 条规格跑在 `lib/fonts.js` 上，覆盖默认值、`system` 逐字等于上游栈、`inherit` 与界面栈相等、预设解析、未知 id 回落、引号剥离、恶意字符丢弃、单条坏名字不牵连整条列表、解析结果里没有 `;{}`、通用族不加引号、CJK 与重音名字存活、去重与两项上限。
 - 调色板：直接求值 `nordTokens()` 得 116 项（81 alias + 10 specific + 25 static），`--dsw-alias-bg-base` = `{light:#ECEFF4, dark:#2E3440}`。
 - 安装：`dsh plugin add` 后 `dsh.profile.bundles` 追加成功，`--dump-config` 出现 `# == dsh-nord` 层；tarball 安装路径同样验证过（见下节彩排）。
@@ -224,9 +287,9 @@ DEEPSEEK_API_KEY=test-key dsh --profile web
 - 路由的响应头与动词（页面内实测）：GET 200 且 `cache-control: no-store`；`POST` 得到 405、`allow: GET`、空体。
 - 排版（隔离实例 + headless Edge 打开真实页面）：出口节点内联样式仍是 `display: contents`、计算值变成 `flex`；出口的两个子节点是官方 pill 行（`1 轮 1 步`，top 870、高 26、`padding-top` 4）与余额条（top 874、高 22、`margin-top: 4px`、`padding: 1px 8px`、`border-radius: 24px`、图标 16×16），后者计算字号 13px、字体 Maple Mono、行高 20px，两行文字同起于 875。
 - 面板：`role="dialog"`、300×159、位于读数上方 `874 − 8 − 159 = 707`、左边缘与读数对齐，圆角 12、内边距 16、字号 12/18、背景即 Nord `nord4`；四行明细取值正确；Escape 关闭；等过一个刷新周期后面板仍开着、数值不变而更新时间前进。载体会话用的是 DeepSeek 模型，所以「用量信息」一行在面板里，重拍时面板实测 300×185（`185 = 159 + 18 + 8`，即那一行的行高与上边距），位置随之变成 `874 − 8 − 185 = 681`；这里原先记的 159 是「用量信息」这一行还不存在时的数值。这是条件行，不是回归——同一支探针打在面板上确认过 `[data-dsh-nord-usage]` 存在。
-- 字体选择器（`node scripts/shots/verify-settings.mjs`，隔离实例 + headless Edge 实测）：只写旧五个键的 `cordis.patch.yml` 仍能启动，四个新字段由 schema 默认值补齐，`--dsw-font-family` = Maple Mono 栈、`--ds-font-family-code` = Maple Mono 栈 + `ui-monospace` 等宽回退；界面字体菜单 10 行（跟随系统 + 8 预设 + 自定义…）、代码字体菜单 11 行（多一行「跟随界面字体」）；菜单经 portal 渲染，卡片 218×357 完整落在视口内（`@ 878,531`），未被设置面板的 overflow 裁掉；8 个预设行各自用自己的字体栈渲染，触发按钮用当前生效栈；换界面字体只动 `--dsw-font-family`，换代码字体只动 `--ds-font-family-code`，选「跟随界面字体」后两个 token 相等；从菜单里选「自定义」后在空字段上直接 `Tab` 离开不会改字体（原选择不变、字段收起），而清空一个已经是 `custom` 的字段会提交——空列表解析成尾栈；自定义串 `Arial; } html { --pwn: 1px !important; } :root {` 被整条丢弃——样式表里花括号恰好一对、`--pwn` 计算值为空，token 回落到尾栈；正常串 `'LXGW WenKai', Microsoft YaHei, sans-serif` 按逗号拆开后重新加引号拼装；`settings.yaml` 落盘 `uiFont: custom` / `uiFontCustom` / `codeFont: inherit`；全程无 console 报错。
-- 设置页（`node scripts/shots/verify-settings.mjs`，同一套隔离实例）：左栏实测 `通用设置 | 模型 | 插件 | Agent 预设 | Nord 主题`，本插件一行在官方四个分区之后；点「通用设置」后整屏文本里搜不到 `Nord 配色` / `底部余额条` / `界面字体` / `API 地址`，确认设置已从「通用」搬走；点左栏那一行后 `[data-dsh-nord-settings]` 恰好一个，页面 `<h2>` 是「Nord 主题」、三个 `<h3>` 是「外观 / 字体 / 余额条」，整页 681px 高落在 746px 的内容列里（列不出现纵向滚动），宽 564px 等于列的可用宽度、不撑横向滚动。三个 `role="switch"` 控件尺寸 36×20，右边缘与所在行右边缘齐平；每行标签下是 12/18 的说明文字；两个 `Input` 实宽 98 与 262；点「底部余额条」后 `aria-checked` 转 `false` 且 `settings.yaml` 落盘 `dsh-nord: balanceEnabled: false`，再点回 `true` 同样落盘。字体选择器带来两个 `aria-haspopup="menu"` 的触发按钮（`size="sm"` 的 outline 胶囊，定宽 200px）与按需出现的自定义 `Input`；两个下拉在「替换字体」关掉时一起进入禁用态。
-- 上游接口兼容性（`node scripts/shots/verify-compat.mjs`，隔离实例 + headless Edge，`0.1.5-rc.3` 上实测）：模块加载器在；三枚插件样式表都在（字体规则 412B、余额表面 2367B、宽表格补丁 69B）；`--dsw-font-family` 起于 Maple Mono；主题层两套调色板各抽 9 项 token（alias / static / specific 三层各取代表，含 `faint` 台阶）全部命中 Nord 值；`conversation.composer.dock` 出口的计算值是 `flex`（插件那条 `:has()` 规则生效）、两个子节点是官方 pill 行与余额条，读数 42.50 CNY；明细面板 `role="dialog"`、300×185、四行明细；「用量信息」行渲染出 `https://platform.deepseek.com/usage`（这一行活着就说明 `ui-session` 的 `useProjection('modelSelection')` 座位仍在投递）；Escape 关闭；全程无 console 报错。
+- 字体选择器（`node scripts/shots/verify-settings.mjs`，隔离实例 + headless Edge 实测）：只写旧五个键的 `cordis.patch.yml` 仍能启动，四个新字段由 schema 默认值补齐，`--dsw-font-family` = Maple Mono 栈、`--ds-font-family-code` = Maple Mono 栈 + `ui-monospace` 等宽回退；界面字体菜单 10 行（跟随系统 + 8 预设 + 自定义…）、代码字体菜单 11 行（多一行「跟随界面字体」）；菜单经 portal 渲染，卡片 218×357 完整落在视口内（`@ 878,531`），未被设置面板的 overflow 裁掉；8 个预设行各自用自己的字体栈渲染，触发按钮用当前生效栈；换界面字体只动 `--dsw-font-family`，换代码字体只动 `--ds-font-family-code`，选「跟随界面字体」后两个 token 相等；从菜单里选「自定义」后在空字段上直接 `Tab` 离开不会改字体（原选择不变、字段收起），而清空一个已经是 `custom` 的字段会提交——空列表解析成尾栈；自定义串 `Arial; } html { --pwn: 1px !important; } :root {` 被整条丢弃——样式表里花括号恰好一对、`--pwn` 计算值为空，token 回落到尾栈；正常串 `'LXGW WenKai', Microsoft YaHei, sans-serif` 按逗号拆开后重新加引号拼装；落盘 `uiFont: custom` / `uiFontCustom` / `codeFont: inherit`（0.1.5 落在 `settings.yaml`，0.1.7 落在 profile 的 `cordis.patch.yml`，探针两个都认）；全程无 console 报错。
+- 设置页（`node scripts/shots/verify-settings.mjs`，同一套隔离实例）：左栏实测 `通用设置 | 模型 | 插件 | Agent 预设 | Nord 主题`，本插件一行在官方四个分区之后；点「通用设置」后整屏文本里搜不到 `Nord 配色` / `底部余额条` / `界面字体` / `API 地址`，确认设置已从「通用」搬走；点左栏那一行后 `[data-dsh-nord-settings]` 恰好一个，页面 `<h2>` 是「Nord 主题」、三个 `<h3>` 是「外观 / 字体 / 余额条」，整页 681px 高落在 746px 的内容列里（列不出现纵向滚动），宽 564px 等于列的可用宽度、不撑横向滚动。三个 `role="switch"` 控件尺寸 36×20，右边缘与所在行右边缘齐平；每行标签下是 12/18 的说明文字；两个 `Input` 实宽 98 与 262；点「底部余额条」后 `aria-checked` 转 `false` 且落盘 `dsh-nord: balanceEnabled: false`（同上：0.1.5 进 `settings.yaml`，0.1.7 进 profile patch），再点回 `true` 同样落盘。字体选择器带来两个 `aria-haspopup="menu"` 的触发按钮（`size="sm"` 的 outline 胶囊，定宽 200px）与按需出现的自定义 `Input`；两个下拉在「替换字体」关掉时一起进入禁用态。
+- 上游接口兼容性（`node scripts/shots/verify-compat.mjs`，隔离实例 + headless Edge，`0.1.5-rc.3` 与 `0.1.7-rc.2` 上分别实测，两代都是 10/10）：模块加载器在；三枚插件样式表都在（字体规则 412B、余额表面 2367B、宽表格补丁 69B）；`--dsw-font-family` 起于 Maple Mono；主题层两套调色板各抽 9 项 token（alias / static / specific 三层各取代表，含 `faint` 台阶）全部命中 Nord 值；`conversation.composer.dock` 出口的计算值是 `flex`（插件那条 `:has()` 规则生效），官方 pill 行与余额条都在（0.1.7 上官方 pill 不在 dock 里，只剩余额条一个子节点），读数 42.50 CNY；明细面板 `role="dialog"`、300×185、四行明细；「用量信息」行渲染出 `https://platform.deepseek.com/usage`（这一行活着就说明 `ui-session` 的 `useProjection('modelSelection')` 座位仍在投递）；Escape 关闭；全程无 console 报错。面板那几处断言都是**等结果**而不是等固定时长：0.1.5 的写是乐观发布，0.1.7 要过一趟 wire，同一个点击在两代落地的时刻不同。
 - 设置字段可编辑（同一套隔离实例，键盘实测）：把刷新间隔从 15 改成 90 必须经过中间态 `9`——输入框里依次显示 `9`、`90`，`Tab` 失焦后落盘 `refreshSeconds: 90`；只输入 `9` 再 `Tab` 会弹回 `90`，且不写盘。URL 字段整段换成 `http://127.0.0.1:3099/` 后 `Tab` 落盘 `baseURL`。改成 `defaultValue` + `key` 之前，同一套操作会被 React 还原成原值，字段实际上改不动。
 - 余额轮询不再被无关设置唤醒：空闲 4 秒窗口内 0 次 `/nord/balance`；拨动「Nord 配色」开关关掉再打开，两次点击前后各 0 次（改前每次点击 2 次——一次乐观发布、一次落盘确认各触发一轮重启）。
 - 余额读数在会话切换后仍然刷新（修掉的 bug，复现脚本 `scripts/shots/poll-repro.mjs`：隔离 home + 每次请求把余额 +1 的 mock，所以条上的数字就是读数的新鲜度）。dock 槽位是 session 作用域、store 按会话各建一个实例，而渲染侧把 entry 的 inject 结果按 (entry × 绑定) 缓存——换到别的会话再换回来时 inject 不会重跑。修前实测：留在 A 时 43 → 45 正常，切到 B 后 46 → 48，切回 A 停在 45；随后 40 秒里 mock 又收了 3 次 `/nord/balance`（轮询一直在跑），而 A 始终是 45；再切到 B 显示 51——写的一直是 B 的 store。修后同一条路径：切回 A 直接显示 48，并继续 48 → 51。

@@ -18,6 +18,7 @@ import { BalanceBar } from './BalanceBar.tsx'
 import { en, LOCALE_NS, zh } from './locales.ts'
 import { FONT_STYLE_ID, fontStylesheet, nordTokens, SECTION_ID, SECTION_ORDER, SURFACE_STYLE_ID, surfaceStylesheet, TABLE_STYLE_ID, tableStylesheet, TOKEN_SOURCE } from './nord.ts'
 import { NordSection } from './NordSection.tsx'
+import { mountSettings } from './settings.ts'
 import { createNordBalanceStore, createNordSettingsStore } from './stores.ts'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
@@ -27,8 +28,15 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
   }
 }
 
-/** Required services: the theme registry, slots, copy, and the durable settings scope. */
-export const inject = ['theme', 'slots', 'locale', 'settingsScope']
+/**
+ * Required services. The settings transport is deliberately NOT listed: an
+ * entry's `inject` is a hard activation gate, and the service carrying it is
+ * named `settingsScope` on dsh 0.1.5-rc.3 and `configForms` on 0.1.7-rc.2 —
+ * listing either breaks the other, and listing both stalls on whichever is
+ * missing (the shell reports `pending (waiting for service: …)` and runs
+ * nothing). {@link mountSettings} resolves it through an optional injection.
+ */
+export const inject = ['theme', 'slots', 'locale']
 
 /** Balance-bar order among the composer dock entries. */
 const BAR_ORDER = 10
@@ -42,238 +50,252 @@ const REQUEST_TIMEOUT_MS = 20_000
  * @param ctx - Client root context.
  */
 export function apply(ctx: ClientContext): void {
-  const scope = ctx.settingsScope.bind<Config>({ namespace: NS })
   const settingsStore = createNordSettingsStore()
   const balanceStore = createNordBalanceStore()
   /** Bound once: repeat binds return the same function, and the nav thunk reads it. */
   const t = ctx.locale.bind(LOCALE_NS)
 
-  /** Durable section folded over the composition defaults. */
-  const effective = (): Config => ({ ...DEFAULTS, ...scope.getSnapshot().value })
-
   ctx.effect(() => ctx.locale.register(LOCALE_NS, { zh, en }), 'dsh-nord: dictionaries')
 
-  // Font stacks ride one `:root` rule: every composite family is declared there
-  // as `var(--dsw-font-family)`, so a body-level token override cannot reach it.
-  // The rule is rewritten from the resolved stacks on every accepted write, and
-  // emptied — not merely left stale — while the layer is off.
-  ctx.effect(() => {
-    const element = document.createElement('style')
-    element.id = FONT_STYLE_ID
-    document.head.append(element)
-    const sync = (): void => {
-      const value = effective()
-      element.textContent = value.fontEnabled ? fontStylesheet(fontStacks(value)) : ''
+  // Everything below reads this plugin's durable settings, and which service
+  // carries them depends on the dsh generation — see `mountSettings`. Nothing
+  // mounts until one of them resolves, so the plugin never half-appears.
+  mountSettings<Config>(ctx, NS, (settings) => {
+    /** Durable section folded over the composition defaults. */
+    const effective = (): Config => ({ ...DEFAULTS, ...settings.getSnapshot().value })
+
+    // Font stacks ride one `:root` rule: every composite family is declared there
+    // as `var(--dsw-font-family)`, so a body-level token override cannot reach it.
+    // The rule is rewritten from the resolved stacks on every accepted write, and
+    // emptied — not merely left stale — while the layer is off.
+    ctx.effect(() => {
+      const element = document.createElement('style')
+      element.id = FONT_STYLE_ID
+      document.head.append(element)
+      const sync = (): void => {
+        const value = effective()
+        element.textContent = value.fontEnabled ? fontStylesheet(fontStacks(value)) : ''
+      }
+      const unsubscribe = settings.subscribe(sync)
+      sync()
+      return () => { unsubscribe(); element.remove() }
+    }, 'dsh-nord: font stacks')
+
+    // A second `<style>` carries the balance surfaces: the dock row that puts the
+    // readout beside the shipped stats pill, the readout's own skin, and its
+    // panel. See `surfaceStylesheet` for why they are not inline styles.
+    ctx.effect(() => {
+      const element = document.createElement('style')
+      element.id = SURFACE_STYLE_ID
+      element.textContent = surfaceStylesheet()
+      document.head.append(element)
+      return () => { element.remove() }
+    }, 'dsh-nord: balance surfaces')
+
+    // A third `<style>` restores ordinary scrolling on wide markdown tables:
+    // upstream's hover-triggered reserve moves the wrapper out from under the
+    // pointer. See `tableStylesheet`.
+    ctx.effect(() => {
+      const element = document.createElement('style')
+      element.id = TABLE_STYLE_ID
+      element.textContent = tableStylesheet()
+      document.head.append(element)
+      return () => { element.remove() }
+    }, 'dsh-nord: wide-table scroll patch')
+
+    // The colour layer, folded over whichever base palette is active.
+    ctx.effect(() => {
+      let applied: (() => void) | undefined
+      const sync = (): void => {
+        applied?.()
+        applied = undefined
+        if (effective().themeEnabled) applied = ctx.theme.overrideTokens(TOKEN_SOURCE, nordTokens())
+      }
+      const unsubscribe = settings.subscribe(sync)
+      sync()
+      return () => { unsubscribe(); applied?.() }
+    }, 'dsh-nord: nord tokens')
+
+    // Settings-page mirror.
+    let settingsBound: BoundActions<typeof settingsStore> | undefined
+    const syncSettings = (): void => {
+      const snapshot = settings.getSnapshot()
+      settingsBound?.sync(
+        { ...DEFAULTS, ...snapshot.value },
+        snapshot.revision ?? -1,
+        snapshot.writable,
+        snapshot.status !== 'unavailable',
+      )
     }
-    const unsubscribe = scope.subscribe(sync)
-    sync()
-    return () => { unsubscribe(); element.remove() }
-  }, 'dsh-nord: font stacks')
-
-  // A second `<style>` carries the balance surfaces: the dock row that puts the
-  // readout beside the shipped stats pill, the readout's own skin, and its
-  // panel. See `surfaceStylesheet` for why they are not inline styles.
-  ctx.effect(() => {
-    const element = document.createElement('style')
-    element.id = SURFACE_STYLE_ID
-    element.textContent = surfaceStylesheet()
-    document.head.append(element)
-    return () => { element.remove() }
-  }, 'dsh-nord: balance surfaces')
-
-  // A third `<style>` restores ordinary scrolling on wide markdown tables:
-  // upstream's hover-triggered reserve moves the wrapper out from under the
-  // pointer. See `tableStylesheet`.
-  ctx.effect(() => {
-    const element = document.createElement('style')
-    element.id = TABLE_STYLE_ID
-    element.textContent = tableStylesheet()
-    document.head.append(element)
-    return () => { element.remove() }
-  }, 'dsh-nord: wide-table scroll patch')
-
-  // The colour layer, folded over whichever base palette is active.
-  ctx.effect(() => {
-    let applied: (() => void) | undefined
-    const sync = (): void => {
-      applied?.()
-      applied = undefined
-      if (effective().themeEnabled) applied = ctx.theme.overrideTokens(TOKEN_SOURCE, nordTokens())
-    }
-    const unsubscribe = scope.subscribe(sync)
-    sync()
-    return () => { unsubscribe(); applied?.() }
-  }, 'dsh-nord: nord tokens')
-
-  // Settings-page mirror.
-  let settingsBound: BoundActions<typeof settingsStore> | undefined
-  const syncSettings = (): void => {
-    const snapshot = scope.getSnapshot()
-    settingsBound?.sync(
-      { ...DEFAULTS, ...snapshot.value },
-      snapshot.revision ?? -1,
-      snapshot.writable,
-      snapshot.status !== 'unavailable',
-    )
-  }
-  ctx.effect(() => {
-    const unsubscribe = scope.subscribe(syncSettings)
-    syncSettings()
-    return unsubscribe
-  }, 'dsh-nord: settings mirror')
-
-  // This plugin's own page in the settings panel: one nav row plus the content
-  // column, contributed to the settings domain's `settings.section` list. The
-  // shell owns the panel, the nav chrome, and the scrolling; a feature owns its
-  // own page, which is why nothing here also lands in the General section.
-  ctx.slots.inject('settings.section', () => ctx.slots.register({
-    name: 'settings.section',
-    id: SECTION_ID,
-    order: SECTION_ORDER,
-    // A thunk, not a string: the shell re-reads the label on every locale
-    // revision, so the nav row follows a language switch without the plugin
-    // re-registering the entry.
-    label: () => t('nav'),
-    locale: LOCALE_NS,
-    store: settingsStore,
-    inject: (actions: BoundActions<typeof settingsStore>) => {
-      settingsBound = actions
+    ctx.effect(() => {
+      const unsubscribe = settings.subscribe(syncSettings)
       syncSettings()
-      return {
-        // One write settles before the caller's next step when the caller
-        // chains; rejecting is turned into the page's own failure line here, so
-        // a caller that ignores the promise leaves no unhandled rejection.
-        save: (field: string, value: unknown): Promise<void> =>
-          scope.set(field, value).catch((cause: unknown) => {
-            settingsBound?.failed(cause instanceof Error ? cause.message : String(cause))
-          }),
+      return unsubscribe
+    }, 'dsh-nord: settings mirror')
+
+    // This plugin's own page in the settings panel: one nav row plus the content
+    // column, contributed to the settings domain's `settings.section` list. The
+    // shell owns the panel, the nav chrome, and the scrolling; a feature owns its
+    // own page, which is why nothing here also lands in the General section.
+    ctx.slots.inject('settings.section', () => ctx.slots.register({
+      name: 'settings.section',
+      id: SECTION_ID,
+      order: SECTION_ORDER,
+      // A thunk, not a string: the shell re-reads the label on every locale
+      // revision, so the nav row follows a language switch without the plugin
+      // re-registering the entry.
+      label: () => t('nav'),
+      locale: LOCALE_NS,
+      store: settingsStore,
+      inject: (actions: BoundActions<typeof settingsStore>) => {
+        settingsBound = actions
+        syncSettings()
+        return {
+          // One write settles before the caller's next step when the caller
+          // chains, and a rejection is turned into the page's own failure line
+          // here, so a caller that ignores the promise leaves no unhandled one.
+          //
+          // The boolean 0.1.7 answers is deliberately ignored: it is `false`
+          // both for a refused write and for one a newer write superseded, and
+          // the controller folds the Host's own state back in either way. The
+          // mirror's next sync publishes whatever actually stands, so reporting
+          // a failure here would flash a spurious error on every rapid edit.
+          save: async (field: string, value: unknown): Promise<void> => {
+            try {
+              await settings.set(field, value)
+            } catch (cause: unknown) {
+              settingsBound?.failed(cause instanceof Error ? cause.message : String(cause))
+            }
+          },
+        }
+      },
+    }, NordSection))
+
+    // Balance polling. The bar binds its actions when the slot declares, which
+    // can land after this effect runs, so the restart hooks are shared.
+    //
+    // The dock is session-scoped and every Session owns its own store instance, so
+    // the poll keeps one writer per Session and publishes into all of them. A
+    // single handle is not enough: the renderer caches an entry's inject result per
+    // (entry × scope binding), so returning to an already-visited Session does NOT
+    // run `inject` again — one handle would keep writing into the Session left
+    // behind and freeze the readout the user is actually looking at.
+    const balanceWriters = new Map<string, BoundActions<typeof balanceStore>>()
+    /** Restart only when a field the poll reads has actually moved. */
+    let syncBalance = (): void => {}
+    /** Restart unconditionally, for the first read a newly bound readout can receive. */
+    let bindBalance = (): void => {}
+
+    ctx.effect(() => {
+      let timer: ReturnType<typeof setInterval> | undefined
+      /** Request counter, and the newest request whose result has been applied. */
+      let sequence = 0
+      let landed = 0
+      let applied: Config | undefined
+      const stop = (): void => {
+        if (timer === undefined) return
+        clearInterval(timer)
+        timer = undefined
       }
-    },
-  }, NordSection))
 
-  // Balance polling. The bar binds its actions when the slot declares, which
-  // can land after this effect runs, so the restart hooks are shared.
-  //
-  // The dock is session-scoped and every Session owns its own store instance, so
-  // the poll keeps one writer per Session and publishes into all of them. A
-  // single handle is not enough: the renderer caches an entry's inject result per
-  // (entry × scope binding), so returning to an already-visited Session does NOT
-  // run `inject` again — one handle would keep writing into the Session left
-  // behind and freeze the readout the user is actually looking at.
-  const balanceWriters = new Map<string, BoundActions<typeof balanceStore>>()
-  /** Restart only when a field the poll reads has actually moved. */
-  let syncBalance = (): void => {}
-  /** Restart unconditionally, for the first read a newly bound readout can receive. */
-  let bindBalance = (): void => {}
-
-  ctx.effect(() => {
-    let timer: ReturnType<typeof setInterval> | undefined
-    /** Request counter, and the newest request whose result has been applied. */
-    let sequence = 0
-    let landed = 0
-    let applied: Config | undefined
-    const stop = (): void => {
-      if (timer === undefined) return
-      clearInterval(timer)
-      timer = undefined
-    }
-
-    /** Fan one update out to every Session's readout. */
-    const publish = (write: (actions: BoundActions<typeof balanceStore>) => void): void => {
-      for (const actions of balanceWriters.values()) write(actions)
-    }
-
-    const refresh = async (): Promise<void> => {
-      const mine = ++sequence
-      publish(actions => { actions.loading() })
-      try {
-        const response = await fetch(BALANCE_PATH, {
-          headers: { accept: 'application/json' },
-          // A hung Host route would otherwise leave this read pending forever.
-          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-        })
-        const body = await response.json().catch(() => undefined) as BalancePayload | BalanceFailure | undefined
-        // Only a result that a NEWER request already superseded is dropped.
-        // Dropping every read the next tick had merely started froze the readout
-        // for as long as responses stayed slower than the interval.
-        if (mine <= landed) return
-        landed = mine
-        if (body === undefined) publish(actions => { actions.failed('request-failed') })
-        else if (isBalanceFailure(body)) publish(actions => { actions.failed(body.error) })
-        else publish(actions => { actions.ready(body) })
-      } catch {
-        // Any transport failure is one user-visible outcome; the Host route
-        // already reports upstream failures as `upstream-failed` payloads.
-        if (mine <= landed) return
-        landed = mine
-        publish(actions => { actions.failed('request-failed') })
+      /** Fan one update out to every Session's readout. */
+      const publish = (write: (actions: BoundActions<typeof balanceStore>) => void): void => {
+        for (const actions of balanceWriters.values()) write(actions)
       }
-    }
 
-    const start = (value: Config): void => {
-      stop()
-      // The endpoint travels with the reading: the panel's usage link falls
-      // back to it when the Session carries no model selection.
-      publish(actions => { actions.endpoint(value.baseURL) })
-      if (!value.balanceEnabled) {
-        publish(actions => { actions.clear() })
-        return
+      const refresh = async (): Promise<void> => {
+        const mine = ++sequence
+        publish(actions => { actions.loading() })
+        try {
+          const response = await fetch(BALANCE_PATH, {
+            headers: { accept: 'application/json' },
+            // A hung Host route would otherwise leave this read pending forever.
+            signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+          })
+          const body = await response.json().catch(() => undefined) as BalancePayload | BalanceFailure | undefined
+          // Only a result that a NEWER request already superseded is dropped.
+          // Dropping every read the next tick had merely started froze the readout
+          // for as long as responses stayed slower than the interval.
+          if (mine <= landed) return
+          landed = mine
+          if (body === undefined) publish(actions => { actions.failed('request-failed') })
+          else if (isBalanceFailure(body)) publish(actions => { actions.failed(body.error) })
+          else publish(actions => { actions.ready(body) })
+        } catch {
+          // Any transport failure is one user-visible outcome; the Host route
+          // already reports upstream failures as `upstream-failed` payloads.
+          if (mine <= landed) return
+          landed = mine
+          publish(actions => { actions.failed('request-failed') })
+        }
       }
-      void refresh()
-      timer = setInterval(() => { void refresh() }, value.refreshSeconds * 1000)
-    }
 
-    // One accepted write publishes twice (the optimistic value, then the Host's
-    // confirmed one), and a theme or font write touches no field the poll reads.
-    // Comparing against the last applied config keeps both from re-querying
-    // upstream.
-    syncBalance = (): void => {
-      const value = effective()
-      if (applied !== undefined
-        && applied.balanceEnabled === value.balanceEnabled
-        && applied.refreshSeconds === value.refreshSeconds
-        && applied.baseURL === value.baseURL) return
-      applied = value
-      start(value)
-    }
+      const start = (value: Config): void => {
+        stop()
+        // The endpoint travels with the reading: the panel's usage link falls
+        // back to it when the Session carries no model selection.
+        publish(actions => { actions.endpoint(value.baseURL) })
+        if (!value.balanceEnabled) {
+          publish(actions => { actions.clear() })
+          return
+        }
+        void refresh()
+        timer = setInterval(() => { void refresh() }, value.refreshSeconds * 1000)
+      }
 
-    // The initial read is issued before the bar can bind its actions, so its
-    // result has nowhere to land; the bind issues the one that counts.
-    bindBalance = (): void => {
-      const value = effective()
-      applied = value
-      start(value)
-    }
+      // One accepted write publishes twice (the optimistic value, then the Host's
+      // confirmed one), and a theme or font write touches no field the poll reads.
+      // Comparing against the last applied config keeps both from re-querying
+      // upstream.
+      syncBalance = (): void => {
+        const value = effective()
+        if (applied !== undefined
+          && applied.balanceEnabled === value.balanceEnabled
+          && applied.refreshSeconds === value.refreshSeconds
+          && applied.baseURL === value.baseURL) return
+        applied = value
+        start(value)
+      }
 
-    // A hidden tab's interval is throttled, and a discarded one stops firing
-    // outright, so the moment the page is visible again re-reads immediately.
-    const onVisibilityChange = (): void => {
-      if (document.visibilityState === 'visible' && timer !== undefined) void refresh()
-    }
-    document.addEventListener('visibilitychange', onVisibilityChange)
+      // The initial read is issued before the bar can bind its actions, so its
+      // result has nowhere to land; the bind issues the one that counts.
+      bindBalance = (): void => {
+        const value = effective()
+        applied = value
+        start(value)
+      }
 
-    const unsubscribe = scope.subscribe(syncBalance)
-    syncBalance()
-    return () => {
-      unsubscribe()
-      document.removeEventListener('visibilitychange', onVisibilityChange)
-      stop()
-      sequence += 1
-      syncBalance = () => {}
-      bindBalance = () => {}
-    }
-  }, 'dsh-nord: balance polling')
+      // A hidden tab's interval is throttled, and a discarded one stops firing
+      // outright, so the moment the page is visible again re-reads immediately.
+      const onVisibilityChange = (): void => {
+        if (document.visibilityState === 'visible' && timer !== undefined) void refresh()
+      }
+      document.addEventListener('visibilitychange', onVisibilityChange)
 
-  ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
-    name: 'conversation.composer.dock',
-    id: 'nord-balance',
-    order: BAR_ORDER,
-    locale: LOCALE_NS,
-    store: balanceStore,
-    inject: (sessionId, actions) => {
-      balanceWriters.set(sessionId, actions)
-      bindBalance()
-      return {}
-    },
-  }, BalanceBar))
+      const unsubscribe = settings.subscribe(syncBalance)
+      syncBalance()
+      return () => {
+        unsubscribe()
+        document.removeEventListener('visibilitychange', onVisibilityChange)
+        stop()
+        sequence += 1
+        syncBalance = () => {}
+        bindBalance = () => {}
+      }
+    }, 'dsh-nord: balance polling')
+
+    ctx.slots.inject('conversation.composer.dock', () => ctx.slots.register({
+      name: 'conversation.composer.dock',
+      id: 'nord-balance',
+      order: BAR_ORDER,
+      locale: LOCALE_NS,
+      store: balanceStore,
+      inject: (sessionId, actions) => {
+        balanceWriters.set(sessionId, actions)
+        bindBalance()
+        return {}
+      },
+    }, BalanceBar))
+  })
 }
+

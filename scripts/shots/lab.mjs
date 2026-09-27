@@ -20,6 +20,13 @@ export const LAB = join(ROOT, '.shot-lab')
 export const HOME = join(LAB, 'home')
 export const OUT = join(LAB, 'out')
 
+/**
+ * 要驱动的那个 `dsh` 可执行文件。默认是 PATH 上的 `dsh`（本机那份）；
+ * 想拿另一个版本跑同一套探针，把 `DSH_BIN` 指到那份安装的 bin。
+ * 见 DEVELOPMENT.md「版本现实 · 并排装另一个 dsh 版本」。
+ */
+export const DSH_BIN = process.env.DSH_BIN ?? 'dsh'
+
 /** mock 余额接口的端口与 key（与 tests/balance-mock.mjs 一致）。 */
 export const MOCK_PORT = 3099
 export const MOCK_KEY = 'test-key'
@@ -145,17 +152,30 @@ export function writeBalancePatch(profile = 'shots') {
   return file
 }
 
-/** 在隔离 home 里备好 profile 并装上本插件（link，指回工作树）。 */
-export async function ensureProfile(profile = 'shots') {
-  const runDsh = (args) => new Promise((settle) => {
-    const child = spawn('dsh', args, {
-      cwd: ROOT, env: { ...process.env, DSH_HOME: HOME }, shell: true, windowsHide: true, stdio: 'pipe',
+/**
+ * 跑一条 dsh 命令并把 stdout / stderr 合起来收回。`DSH_HOME` 默认钉在隔离 home 上，
+ * 传 `env` 可以整份替换（`--version` 这种不碰 home 的调用就不必先铺 home）。
+ */
+function runDsh(args, { env } = {}) {
+  return new Promise((settle) => {
+    const child = spawn(DSH_BIN, args, {
+      cwd: ROOT, env: env ?? { ...process.env, DSH_HOME: HOME }, shell: true, windowsHide: true, stdio: 'pipe',
     })
     let out = ''
     child.stdout.on('data', (c) => { out += c })
     child.stderr.on('data', (c) => { out += c })
     child.on('close', (code) => settle({ code, out }))
   })
+}
+
+/** `DSH_BIN` 报出的版本号。探针输出里带上它，免得把两个实例的结果看串。 */
+export async function dshVersion() {
+  const { out } = await runDsh(['--version'], { env: { ...process.env } })
+  return out.trim().split('\n').pop()?.trim() ?? ''
+}
+
+/** 在隔离 home 里备好 profile 并装上本插件（link，指回工作树）。 */
+export async function ensureProfile(profile = 'shots') {
   const init = await runDsh(['--profile', profile, '--from-default-profile', 'web', '--dump-config'])
   if (init.code !== 0) throw new Error(`初始化 profile 失败:\n${init.out}`)
   const add = await runDsh(['plugin', '--profile', profile, 'add', `link:${ROOT}`])
@@ -165,7 +185,7 @@ export async function ensureProfile(profile = 'shots') {
 
 /** 起隔离实例并等它打印 URL。 */
 export async function startServer({ profile = 'shots', workspace = ROOT } = {}) {
-  const child = spawn('dsh', ['--profile', profile, '--no-open', '--port', '0'], {
+  const child = spawn(DSH_BIN, ['--profile', profile, '--no-open', '--port', '0'], {
     cwd: workspace, env: { ...process.env, DSH_HOME: HOME }, shell: true, windowsHide: true,
   })
   let output = ''

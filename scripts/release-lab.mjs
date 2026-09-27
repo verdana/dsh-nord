@@ -35,6 +35,12 @@ const LAB = join(ROOT, '.release-lab')
 const LAB_HOME = join(LAB, 'home')
 const ARTIFACTS = join(LAB, 'artifacts')
 
+/**
+ * 要驱动的那个 `dsh` 可执行文件。默认是 PATH 上的 `dsh`；想拿另一个版本跑同一套
+ * 检查，把 `DSH_BIN` 指到那份安装的 bin。见 DEVELOPMENT.md「版本现实 · 并排装另一个 dsh 版本」。
+ */
+const DSH_BIN = process.env.DSH_BIN ?? 'dsh'
+
 /** 包清单：参数解析（--help 文本要引用包名）与后续核查都要用，所以先读。 */
 const reader = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8'))
 const PKG_NAME = reader.name
@@ -169,7 +175,7 @@ function prepareLab() {
 
 /** 跑 `dsh` 的统一入口：DSH_HOME 钉死在 lab 里。 */
 function dsh(args, options = {}) {
-  return run('dsh', args, { ...options, env: { DSH_HOME: options.home ?? LAB_HOME, ...options.env } })
+  return run(DSH_BIN, args, { ...options, env: { DSH_HOME: options.home ?? LAB_HOME, ...options.env } })
 }
 
 const profileDir = (profile) => join(LAB_HOME, 'profiles', profile)
@@ -436,7 +442,7 @@ function checkResolve(profile) {
 /** 4) 起一次 web，从首页的 __DSH_BOOT__ 里确认客户端半边进了 entries。 */
 async function checkBoot(profile, emit = log) {
   const home = LAB_HOME
-  const child = spawn('dsh', ['--profile', profile, '--no-open', '--port', '0'], {
+  const child = spawn(DSH_BIN, ['--profile', profile, '--no-open', '--port', '0'], {
     cwd: ROOT,
     env: { ...process.env, DSH_HOME: home },
     shell: process.platform === 'win32',
@@ -548,6 +554,9 @@ async function runMethod(method, emit = log) {
 
 async function main() {
   log(bold(`release-lab: ${PKG_NAME}@${PKG_VERSION}`))
+  // 带上 dsh 版本：DSH_BIN 一换，同一份报告说的就是另一个 dsh 了，不写清楚会看串。
+  const version = (await run(DSH_BIN, ['--version'])).stdout.trim().split('\n').pop()?.trim()
+  log(dim(`  dsh: ${version || DSH_BIN}`))
   log(dim(`  隔离 home: ${LAB_HOME}`))
   log(dim(`  真实 home 未被触碰（DSH_HOME 已重定向）`))
   log()
