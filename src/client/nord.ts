@@ -272,8 +272,8 @@ export function fontStylesheet(stacks: FontStacks): string {
  * `ui-primitives` keeps the horizontal bar hidden at rest and swaps it in on
  * hover while reserving its height with `padding-bottom`, which moves the
  * wrapper out from under the pointer that triggered the swap. Pinning the
- * reserve only trades that collapse for an 8px hover jump, so the state is
- * pinned instead; DEVELOPMENT.md records the measurements.
+ * reserve only trades that collapse for a hover jump, so the state itself is
+ * pinned instead — see DEVELOPMENT.md「宽表格为什么被钉在 `auto`」。
  * @returns stylesheet text for one `<style>` element.
  */
 export function tableStylesheet(): string {
