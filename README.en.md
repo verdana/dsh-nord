@@ -8,7 +8,7 @@ A Nord repaint for the [dsh](https://github.com/deepseek-ai/deepseek-harness) We
 
 ## Features
 
-- **Nord palette** —— 116 design tokens, one set for light and one for dark, following dsh's own *Appearance* setting. No hard-coded colors, no DOM surgery, and uninstalling restores everything.
+- **Nord palette** —— 120 design tokens (85 semantic aliases, 10 named surfaces, 25 raw-scale patches), one set for light and one for dark, following dsh's own *Appearance* setting. No hard-coded colors, no DOM surgery, and uninstalling restores everything.
 - **Selectable fonts** —— Interface font and code font are chosen separately: follow the system, one of eight presets (Maple Mono, JetBrains Mono, Cascadia Code, Fira Code, Sarasa Gothic, LXGW WenKai, HarmonyOS Sans, MiSans), or your own CSS `font-family` string. A preset is a full fallback stack, so a family you don't have installed drops through to the next one, with CJK fallbacks appended by the plugin; every row in the dropdown renders in its own font, so you see the real result before you pick it. The UI font size still derives from dsh's *Font size* setting.
 - **Balance readout** —— Below the composer, on the same row as the official turn/step stats. Click it for a detail panel. With a DeepSeek model (or when the balance endpoint itself is DeepSeek), the panel gains a *Usage* row linking to [platform.deepseek.com/usage](https://platform.deepseek.com/usage); panels for other providers are left untouched.
 
@@ -32,11 +32,11 @@ A Nord repaint for the [dsh](https://github.com/deepseek-ai/deepseek-harness) We
 From npm:
 
 ```sh
-dsh plugin --profile web add dsh-nord@^0.2.0
+dsh plugin --profile web add dsh-nord@^0.3.0
 dsh web
 ```
 
-Write a range like `^0.2.0` rather than letting pnpm resolve `latest`. Since pnpm 11 there is a 24-hour "new version cooldown": while a release is less than a day old, `@latest` does not resolve to it and silently installs the previous version instead (an easy trap right after publishing). For an exact version, spell it out: `dsh-nord@0.2.0`.
+Write a range like `^0.3.0` rather than letting pnpm resolve `latest`. Since pnpm 11 there is a 24-hour "new version cooldown": while a release is less than a day old, `@latest` does not resolve to it and silently installs the previous version instead (an easy trap right after publishing). For an exact version, spell it out: `dsh-nord@0.3.1`.
 
 From this repository's source:
 

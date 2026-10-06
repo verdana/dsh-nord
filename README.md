@@ -8,7 +8,7 @@
 
 ## 功能
 
-- **Nord 配色** —— 116 个设计 token，浅色与深色两套，跟随 dsh 的「外观」设置切换；不写死颜色、不改 DOM，卸载即还原。
+- **Nord 配色** —— 120 个设计 token（85 个语义 alias、10 个具名表面、25 个静态色阶补丁），浅色与深色两套，跟随 dsh 的「外观」设置切换；不写死颜色、不改 DOM，卸载即还原。
 - **字体可选** —— 界面字体与代码字体分开选：跟随系统、八个预设（Maple Mono、JetBrains Mono、Cascadia Code、Fira Code、更纱黑体、霞鹜文楷、HarmonyOS Sans、MiSans），或者自己填一条 CSS `font-family`。预设是一整条回退栈，没装的家族自动落到下一个，中文回退由插件补在后面；下拉里的每一行用它自己的字体渲染，所以挑之前就能看到实际效果。界面字号仍跟随 dsh 的「字号大小」设置派生。
 - **余额读数** —— composer 下方，与官方的轮次/步骤统计在同一行。点击弹出明细面板。用 DeepSeek 模型时（或余额接口就是 DeepSeek 时），面板底部多一行「用量信息」，直达 [platform.deepseek.com/usage](https://platform.deepseek.com/usage)；其他供应商的面板保持原样。
 
@@ -32,11 +32,11 @@
 从 npm：
 
 ```sh
-dsh plugin --profile web add dsh-nord@^0.2.0
+dsh plugin --profile web add dsh-nord@^0.3.0
 dsh web
 ```
 
-版本写成 `^0.2.0` 这样的范围，而不是让 pnpm 去解 `latest` 标签。原因是 pnpm 11 起默认有 24 小时的「新版本冷静期」：某个版本发布不满一天时，`@latest` 解析不到它，会静默装回上一个版本（刚发版后想立刻验证时很容易踩到）。要装某个确切版本就直接写全，例如 `dsh-nord@0.2.0`。
+版本写成 `^0.3.0` 这样的范围，而不是让 pnpm 去解 `latest` 标签。原因是 pnpm 11 起默认有 24 小时的「新版本冷静期」：某个版本发布不满一天时，`@latest` 解析不到它，会静默装回上一个版本（刚发版后想立刻验证时很容易踩到）。要装某个确切版本就直接写全，例如 `dsh-nord@0.3.1`。
 
 从本仓库源码：
 
