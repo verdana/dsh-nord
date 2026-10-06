@@ -24,7 +24,7 @@ A Nord repaint for the [dsh](https://github.com/deepseek-ai/deepseek-harness) We
 
 ## Requirements
 
-- dsh **`0.1.5-rc.3`** (npm `latest`) and **`0.1.7-rc.2`** (`next`) —— both tested end to end; `0.1.5-rc.1` and `0.1.5-rc.2` were verified as well and differ in nothing this plugin touches. The settings mechanism changed between the two generations (`settingsScope` → `configForms`, `installSection` removed); the plugin branches at runtime, so you don't install a different package per version. Other versions: [DEVELOPMENT.md](DEVELOPMENT.md#版本现实) (Chinese).
+- dsh **`0.2.0-rc.2`** (npm `latest` and `next`) —— the build baseline, tested end to end; **`0.1.5-rc.3`** and **`0.1.7-rc.2`** are supported and each tested as well, and `0.1.5-rc.1` / `0.1.5-rc.2` differ in nothing this plugin touches. The settings mechanism changed twice (`settingsScope` → `configForms`, `installSection` removed, and 0.2.0 deleted the `settingsScope` declarations outright); the plugin branches at runtime, so you don't install a different package per version. Other versions: [DEVELOPMENT.md](DEVELOPMENT.md#版本现实) (Chinese).
 - The balance readout needs `DEEPSEEK_API_KEY` (resolved through dsh's credentials service). Without credentials the bar shows an error message; theme, fonts, and settings are unaffected.
 
 ## Install

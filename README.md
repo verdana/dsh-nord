@@ -24,7 +24,7 @@
 
 ## 环境要求
 
-- dsh **`0.1.5-rc.3`**（npm 上的 `latest`）与 **`0.1.7-rc.2`**（`next`）—— 两代都实测通过；`0.1.5-rc.1`、`0.1.5-rc.2` 同样验证过，与本插件用到的接口无差异。两代之间设置机制换过一次（`settingsScope` → `configForms`、`installSection` 被移除），插件在运行时自行分流，不必按版本装不同的包。其他版本见 [DEVELOPMENT.md](DEVELOPMENT.md#版本现实)。
+- dsh **`0.2.0-rc.2`**（npm 上的 `latest` 与 `next`）—— 构建基线，实测通过；**`0.1.5-rc.3`** 与 **`0.1.7-rc.2`** 同样支持并各自实测过，`0.1.5-rc.1`、`0.1.5-rc.2` 也与本插件用到的接口无差异。设置机制换过两次（`settingsScope` → `configForms`、`installSection` 被移除，0.2.0 又把 `settingsScope` 的声明一并删净），插件在运行时自行分流，不必按版本装不同的包。其他版本见 [DEVELOPMENT.md](DEVELOPMENT.md#版本现实)。
 - 余额读数需要 `DEEPSEEK_API_KEY`（由 dsh 的 credentials 服务解析）。没有凭据时余额条显示错误文案，主题、字体、设置不受影响。
 
 ## 安装

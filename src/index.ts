@@ -48,6 +48,29 @@ function resolved(config: NordConfig): NordConfig {
 }
 
 /**
+ * dsh 0.1.5's namespace registration, as this plugin used it.
+ *
+ * Declared structurally rather than read off `settings`: the declaration this
+ * repo builds against — 0.2.0's `SettingsForms` — carries no `installSection` at
+ * all, and the 0.1.5 package that did is not installed. The runtime shape it
+ * serves is unchanged, so it is stated here the way `src/client/settings.ts`
+ * states the 0.1.5 settings scope.
+ */
+type LegacyInstallSection = (
+  this: unknown,
+  ctx: Context,
+  namespace: string,
+  schema: unknown,
+  base: unknown,
+  hooks: {
+    /** Hands this plugin the namespace's live source. */
+    setSource: (current: () => NordConfig) => void
+    /** Invoked after an accepted write. */
+    onChange: (value: NordConfig) => void
+  },
+) => void
+
+/**
  * Mount the settings namespace and the balance route.
  * @param ctx - Host plugin context.
  * @param config - composition entry used as the settings base layer.
@@ -66,35 +89,41 @@ export function apply(ctx: Context, config: NordConfig): void {
     // browser half asks `configForms.get()` for. There is nothing to install;
     // what is left to say is that this plugin ships its OWN page, so the
     // generated one must not be composed beside it.
-    if (typeof settings.installSection !== 'function') {
-      const configure = (settings as unknown as {
-        configure?: (presentation: { auto?: boolean }, owner?: unknown) => () => void
-      }).configure
-      // Owned by this plugin's fiber and disposed with it — the shape the
-      // shipped preference owners use.
-      if (configure !== undefined) settingsCtx.effect(() => configure({ auto: false }, ctx.fiber))
+    //
+    // 0.2.0 dropped the method from its declarations as well, so the 0.1.5 branch
+    // is taken through {@link LegacyInstallSection} — a runtime shape this build
+    // cannot see — and the branch below it is the one every newer generation
+    // runs.
+    const { installSection } = settings as unknown as { installSection?: LegacyInstallSection }
+    if (typeof installSection === 'function') {
+      // `PlainConfig`, not `Config`: 0.1.5 resolves the namespace through whatever
+      // schema it is handed and keeps the result as the wire value, so the
+      // volatile marker would replace every field with a `{ get() {} }` shell the
+      // browser cannot decode — writes would persist and never come back. See
+      // `src/schema.ts`.
+      //
+      // The base layer is the UNWRAPPED composition entry, not `config` itself:
+      // 0.1.5's `describe()` does `structuredClone(registration.base)`, and a
+      // `Volatile` wrapper carries functions — cloning one throws `DataCloneError`,
+      // which empties the whole namespace list and leaves the browser half
+      // reporting `unavailable` with no clue as to why.
+      installSection.call(settings, ctx, NS, PlainConfig, resolved(config), {
+        // 0.1.5 hands back its own live source; unwrap it the same way, so a host
+        // that later grows the marker cannot leak a wrapper into `source()`.
+        setSource: (current) => { source = () => resolved(current()) },
+        // The route reads `source()` per request and the browser half reads its
+        // own scope snapshot, so an accepted change needs no rebuild here.
+        onChange: () => {},
+      })
       return
     }
 
-    // `PlainConfig`, not `Config`: 0.1.5 resolves the namespace through whatever
-    // schema it is handed and keeps the result as the wire value, so the
-    // volatile marker would replace every field with a `{ get() {} }` shell the
-    // browser cannot decode — writes would persist and never come back. See
-    // `src/schema.ts`.
-    //
-    // The base layer is the UNWRAPPED composition entry, not `config` itself:
-    // 0.1.5's `describe()` does `structuredClone(registration.base)`, and a
-    // `Volatile` wrapper carries functions — cloning one throws `DataCloneError`,
-    // which empties the whole namespace list and leaves the browser half
-    // reporting `unavailable` with no clue as to why.
-    settings.installSection(ctx, NS, PlainConfig, resolved(config), {
-      // 0.1.5 hands back its own live source; unwrap it the same way, so a host
-      // that later grows the marker cannot leak a wrapper into `source()`.
-      setSource: (current) => { source = () => resolved(current()) },
-      // The route reads `source()` per request and the browser half reads its
-      // own scope snapshot, so an accepted change needs no rebuild here.
-      onChange: () => {},
-    })
+    const configure = (settings as unknown as {
+      configure?: (presentation: { auto?: boolean }, owner?: unknown) => () => void
+    }).configure
+    // Owned by this plugin's fiber and disposed with it — the shape the shipped
+    // preference owners use.
+    if (configure !== undefined) settingsCtx.effect(() => configure({ auto: false }, ctx.fiber))
   })
 
   ctx.inject(['webServer'], (webCtx) => {

@@ -220,6 +220,27 @@ const TOKENS: readonly (readonly [name: string, light: string, dark: string])[] 
   ['--dsw-static-blue-450', P.nord9, P.nord9],
   ['--dsw-static-blue-500', P.nord10, P.nord8],
   ['--dsw-static-blue-900', P.nord10, P.nord9],
+
+  // dsh 0.2.0 additions. The palette gained these eight alias tokens after
+  // 0.1.7; these four are the ones that do not land on Nord by themselves. The
+  // menu group header is a hardcoded neutral in the palette, so no alias of this
+  // layer can reach it; the three label tokens mix in static rungs this layer
+  // deliberately leaves alone (`neutral-1000`, `blue-950`, `blue-300`), or read
+  // `neutral-00` in the mode where Nord flips it dark — which is why the dark
+  // shimmer needs an explicit value rather than the palette's own mix.
+  //
+  // Each value keeps the token's original job: the header band hides the rows
+  // that scroll under it, the two deep-diving tokens colour and then sweep the
+  // thinking label of a DeepSeek account, and the shimmer stays one step off its
+  // own label — dimmer in light, brighter in dark, as upstream has it.
+  //
+  // The other four (`switch-thumb`, `bg-document-selection`, `turn-trigger-bg`
+  // and its hover) already resolve to Nord through the aliases and statics above,
+  // so they are deliberately absent here.
+  ['--dsw-alias-menu-group-header-fill', 'rgba(236, 239, 244, 0.94)', 'rgba(59, 66, 82, 0.94)'],
+  ['--dsw-alias-label-shimmer', 'rgba(46, 52, 64, 0.3)', 'rgba(216, 222, 233, 0.45)'],
+  ['--dsw-alias-label-deep-diving', 'color-mix(in srgb, #5E81AC 70%, #2E3440)', P.nord8],
+  ['--dsw-alias-label-deep-diving-shimmer', 'color-mix(in srgb, #5E81AC 30%, #2E3440)', 'color-mix(in srgb, #ECEFF4 65%, #8FBCBB)'],
 ]
 
 /**

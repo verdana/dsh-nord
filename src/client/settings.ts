@@ -7,7 +7,7 @@
  * controller keyed by the namespace (`{ namespace: entryId }`), so it is a
  * rename, not a redesign. The snapshot carries identical fields, and the three
  * write methods differ only in their settlement: 0.1.5 resolves `void` and
- * signals refusal by rejecting, 0.1.7 resolves `boolean`.
+ * signals refusal by rejecting, 0.1.7 and later resolve `boolean`.
  *
  * Neither service name may go into the plugin's `inject`. An entry's `inject` is
  * a hard activation gate — the shell reports `pending (waiting for service: …)`
@@ -15,21 +15,27 @@
  * lacks one, and listing one breaks the other. {@link mountSettings} therefore
  * registers an optional injection per name and mounts on whichever resolves.
  *
- * The 0.1.7 side is declared structurally rather than imported: that package is
- * not a dependency of this repo, and loading both generations' declarations at
- * once makes their two `SlotMap` module augmentations collide (the
- * `settings.section` owner props differ between them). `verify-compat` is what
- * actually proves this shape, not the compiler — see DEVELOPMENT.md.
+ * Only one generation's declarations can be loaded at a time — their two
+ * `SlotMap` module augmentations collide (the `settings.section` owner props
+ * differ between them) — so exactly one side is imported and every other is
+ * declared structurally. This repo builds against `0.2.0-rc.2`, so the imported
+ * side is `configForms` and the declared side is 0.1.5's `settingsScope`;
+ * `0.2.0-rc.2` deleted that service *and* its declarations, so the older side has
+ * nothing left to import even if the pin moved. `verify-compat` is what actually
+ * proves the runtime side, not the compiler — see DEVELOPMENT.md.
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigFormSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
 
 /**
- * The snapshot fields this plugin reads. Taken from the 0.1.5 declaration
- * because 0.1.7's is field-for-field identical, and taking it from the version
- * that is actually installed keeps the compiler honest about the rest.
+ * The snapshot fields this plugin reads. Taken from the declarations this repo
+ * builds against — 0.2.0's `ConfigFormSnapshot` — because the four fields are
+ * field-for-field what 0.1.5's `SettingsScopeSnapshot` carried, and that name no
+ * longer exists in the package at all (0.2.0 deleted `settingsScope` and its
+ * types along with it). Taking them from the generation that still ships keeps
+ * the compiler honest about the rest.
  */
-export type SettingsSnapshot<T> = Pick<SettingsScopeSnapshot<T>, 'status' | 'value' | 'revision' | 'writable'>
+export type SettingsSnapshot<T> = Pick<ConfigFormSnapshot<T>, 'status' | 'value' | 'revision' | 'writable'>
 
 /** One namespace's durable settings, whichever generation is hosting. */
 export interface SettingsTransport<T> {
@@ -63,9 +69,26 @@ interface ConfigForms {
   get<T>(entryId: string): ConfigForm<T>
 }
 
+/**
+ * The 0.1.5 per-namespace scope (`ctx.settingsScope.bind`), as this plugin uses
+ * it.
+ *
+ * Declared rather than imported: dsh 0.2.0 deleted both the `settingsScope`
+ * service and its `SettingsScope` / `SettingsScopeSnapshot` declarations, so
+ * there is nothing left to import while the runtime shape this adapter serves is
+ * unchanged. Everything below is duck-typed at the service read anyway, so this
+ * is the same kind of view the 0.1.7 side already carries — only its write
+ * method differs, resolving `void` and rejecting to signal a refusal.
+ */
+interface LegacySettingsScope<T> {
+  getSnapshot(): SettingsSnapshot<T>
+  subscribe(listener: () => void): () => void
+  set(field: string, value: unknown): Promise<void>
+}
+
 /** The 0.1.5 settings-transport service (`ctx.settingsScope`). */
 interface SettingsScopeBinder {
-  bind<T>(spec: { namespace: string }): SettingsScope<T>
+  bind<T>(spec: { namespace: string }): LegacySettingsScope<T>
 }
 
 /** The only context surface this module needs: a service lookup. */
@@ -92,7 +115,7 @@ function asScopeBinder(value: unknown): SettingsScopeBinder | undefined {
 }
 
 /** Adapt 0.1.5's scope: a resolution is acceptance, a rejection is the failure. */
-function adaptScope<T>(scope: SettingsScope<T>): SettingsTransport<T> {
+function adaptScope<T>(scope: LegacySettingsScope<T>): SettingsTransport<T> {
   return {
     getSnapshot: () => scope.getSnapshot(),
     subscribe: (listener) => scope.subscribe(listener),

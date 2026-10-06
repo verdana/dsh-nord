@@ -38,20 +38,25 @@ const CARET_SIZE = 14
 /**
  * The menu trigger's caret.
  *
- * ui-primitives renamed its entire icon set between dsh 0.1.5 and 0.1.7: every
- * size-suffixed export lost its suffix (`IconChevronDownOutline14` →
- * `IconChevronDownOutline`), and the artwork was redrawn — the 0.1.5 shape is a
- * fill on a 14-unit viewBox, the 0.1.7 one a 1px stroke on a 16-unit viewBox.
- * **No single name renders on both**, so resolve whichever this host ships and
- * keep each version's own drawing.
+ * ui-primitives has renamed its icon set twice: 0.1.5 spelled the size into the
+ * name (`IconChevronDownOutline14`, a fill on a 14-unit viewBox), 0.1.7 dropped
+ * the suffix and redrew the glyph as a 1px stroke on a 16-unit viewBox
+ * (`IconChevronDownOutline`), and 0.2.0 split every glyph into two weights
+ * (`IconChevronDownOutlineRegular` / `…Medium`). **No single name renders on all
+ * three**, so resolve whichever this host ships and keep each version's own
+ * drawing — newest first, because a host that ships both spellings is one that
+ * is midway through a rename.
  *
- * The last resort is a copy of the newer artwork rather than nothing: importing
+ * The last resort is a copy of the newest artwork rather than nothing: importing
  * a name the host does not export yields `undefined`, and passing that as a
  * component type is React error #130 — which takes the whole settings page down
- * with it. A cosmetic caret is not worth that.
+ * with it. A cosmetic caret is not worth that. Its 14px/1px-stroke geometry is
+ * what `IconChevronDownOutlineRegular` draws, so the fallback is the host glyph
+ * rather than a lookalike.
  */
 const CaretDown: ComponentType<{ size?: number; className?: string }> =
-  (primitives as unknown as Record<string, ComponentType<{ size?: number; className?: string }> | undefined>).IconChevronDownOutline
+  (primitives as unknown as Record<string, ComponentType<{ size?: number; className?: string }> | undefined>).IconChevronDownOutlineRegular
+  ?? (primitives as unknown as Record<string, ComponentType<{ size?: number; className?: string }> | undefined>).IconChevronDownOutline
   ?? (primitives as unknown as Record<string, ComponentType<{ size?: number; className?: string }> | undefined>).IconChevronDownOutline14
   ?? (() => (
     <svg width={CARET_SIZE} height={CARET_SIZE} viewBox="0 0 16 16" fill="none" aria-hidden="true">
