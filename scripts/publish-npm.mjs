@@ -12,6 +12,9 @@
  *   4. tarball 核查 —— npm pack --dry-run --json 拿到真实文件清单，核对必须有的与绝不能有的
  *   5. registry 核查 —— 这个版本是否已存在、包名归谁、当前登录身份是否为维护者
  *   6. 发布         —— 默认不真发（dry-run），要真发必须显式 --publish
+ *   7. 发布后核对   —— 先等 registry 的读副本列出这个版本（有上限），再核对 tarball 与 dist-tag；
+ *                     发布是写、核对是读，几秒内查不到属于读写窗口，不是失败
+ *   8. tag + 冒烟   —— 打 git commit/tag；--smoke 时同样先等版本可查，再让 release-lab 从 registry 装一遍
  *
  * 本机三个坑（都已在脚本里处理）：
  *   - `~/.npmrc` 的 registry 指向 mirrors.cloud.tencent.com，镜像是只读的：
@@ -91,6 +94,7 @@ const opts = {
   smoke: false,
   keepTarball: false,
   timeoutMs: 600_000,
+  propagationTimeoutMs: 180_000,
 }
 
 const argv = process.argv.slice(2)
@@ -111,6 +115,11 @@ for (let i = 0; i < argv.length; i += 1) {
   else if (arg === '--dry-run-pack') opts.dryRunPack = true
   else if (arg === '--smoke') opts.smoke = true
   else if (arg === '--keep-tarball') opts.keepTarball = true
+  else if (arg === '--propagation-timeout') {
+    const seconds = Number(value())
+    if (!Number.isFinite(seconds) || seconds < 0) fail(`--propagation-timeout 需要一个非负秒数，收到 ${JSON.stringify(argv[i])}`)
+    opts.propagationTimeoutMs = seconds * 1000
+  }
   else if (arg === '--yes' || arg === '-y') {
     // 早期版本要求 --publish 之外再给 --yes；现在不需要了，但老命令别静默做事
     process.stderr.write('publish-npm: --yes 已不需要（--publish 本身就是确认）；照常继续\n')
@@ -138,6 +147,8 @@ function printHelp() {
   --provenance             带 provenance 发布（需 CI 与 GitHub Actions 环境）
   --smoke                  发布成功后立刻用 release-lab 从 registry 装一遍
   --keep-tarball           保留打出来的 tarball
+  --propagation-timeout <秒>
+                           发布后等 registry 列出该版本的上限（默认 180；0 = 查一次就走）
 
 发布前修正:
   --bump <patch|minor|major|prepatch|x.y.z>
@@ -208,6 +219,8 @@ function git(args) {
   const result = spawnSync('git', args, { cwd: ROOT, encoding: 'utf8', windowsHide: true })
   return { code: result.status ?? -1, out: (result.stdout ?? '').trim(), err: (result.stderr ?? '').trim() }
 }
+
+const sleep = (ms) => new Promise((done) => setTimeout(done, ms))
 
 // ── 1. 工作树闸门 ────────────────────────────────────────────────────────────
 
@@ -527,20 +540,94 @@ async function doPublish() {
   return { published: true, tag, ms: result.ms }
 }
 
+/** 两次轮询之间的间隔。 */
+const PROPAGATION_POLL_MS = 5_000
+
+/**
+ * 等 registry 真的能给出这次发的版本。
+ *
+ * 发布是写入，核对与冒烟都是读取，而 registry 的读副本要过一会儿才跟上——实测
+ * 2026-10-06 发 0.3.1：发布后几秒内 `npm view <包>@<版本>` 得 E404、`dist-tags`
+ * 还是上一个版本；约 1 分钟后 npmjs 能查到，腾讯镜像再晚一两分钟。这不是失败，
+ * 是读写窗口，所以这里先等到版本出现在 packument 的 `versions` 里再做后面的事，
+ * 而不是把窗口当成「包有问题」报出去。
+ *
+ * 超时不抛异常：读副本慢过头是正常结果，由调用方决定措辞（warning + 手工命令）。
+ * 返回的 `reachable` 用来区分「registry 没回答」与「registry 说还没有这个版本」：
+ * 前者是网络/代理问题（这里的直连 `fetch` 不走 ~/.npmrc 的 proxy），报成后者会把
+ * 排查引错方向；packument 回 404 属于后者——registry 明确回答了，只是还没有。
+ * @param encoded - URL 编码后的包名。
+ * @returns 等到与否、等了多少毫秒、packument 上的 latest 指向、是否得到过明确回答，以及读不到时的原因。
+ */
+async function waitForVersion(encoded) {
+  const started = Date.now()
+  let latest = null
+  let announced = false
+  let reachable = false
+  let failure = ''
+  for (;;) {
+    let outcome
+    try {
+      outcome = await registryJson(encoded, opts.registry)
+    } catch (error) {
+      outcome = { status: 0, body: null, threw: error instanceof Error ? error.message : String(error) }
+    }
+    if (outcome.body !== null) {
+      reachable = true
+      latest = outcome.body['dist-tags']?.latest ?? null
+      if (Object.hasOwn(outcome.body.versions ?? {}, PKG_VERSION)) {
+        return { ready: true, waitedMs: Date.now() - started, latest, reachable, failure }
+      }
+    } else if (outcome.status === 404) {
+      // registry 明确回答「这个包还没有」——首次发布时就是这样，不是读不到
+      reachable = true
+    } else {
+      failure = outcome.threw ?? `HTTP ${outcome.status}`
+    }
+    const waited = Date.now() - started
+    if (waited >= opts.propagationTimeoutMs) return { ready: false, waitedMs: waited, latest, reachable, failure }
+    if (!announced) {
+      announced = true
+      info(`registry 还没列出 ${PKG_VERSION} —— 写入已成功，等读副本跟上（最多等 ${(opts.propagationTimeoutMs / 1000).toFixed(0)}s）`)
+    }
+    await sleep(PROPAGATION_POLL_MS)
+  }
+}
+
 async function verifyAfterPublish(tag) {
   step('发布后核对')
+
+  const encoded = PKG_NAME.startsWith('@') ? PKG_NAME.replace('/', '%2f') : PKG_NAME
+  const propagated = await waitForVersion(encoded)
+  if (propagated.ready) ok(`${PKG_NAME}@${PKG_VERSION} 已在 registry 的版本列表里（发布后 ${(propagated.waitedMs / 1000).toFixed(1)}s）`)
+  else if (!propagated.reachable) {
+    warn(`读不到 ${opts.registry}（${propagated.failure || '没有响应'}）。这个探测是直连 fetch，不走 ~/.npmrc 的 proxy；` +
+      'npm 命令会走 —— 核对跳过，稍后手工核对：\n' +
+      `       npm view ${PKG_NAME}@${PKG_VERSION} version dist.tarball --registry ${opts.registry}`)
+  } else {
+    warn(`等了 ${(propagated.waitedMs / 1000).toFixed(0)}s 仍没在 registry 上列出 ${PKG_VERSION} —— ` +
+      '大概率只是读副本落后，稍后手工核对：\n' +
+      `       npm view ${PKG_NAME}@${PKG_VERSION} version dist.tarball --registry ${opts.registry}`)
+  }
+
   const view = await run('npm', ['view', `${PKG_NAME}@${PKG_VERSION}`, 'version', 'dist.tarball', 'dist.integrity', '--registry', opts.registry])
-  if (view.code !== 0) warn(`registry 上还没查到这个版本（可能刚推上去，稍等再试）：${view.stderr.trim().split('\n')[0]}`)
-  else {
+  if (view.code !== 0) {
+    // 等到过又查不到，说明不是时序问题，值得把原文贴出来
+    const first = view.stderr.trim().split('\n')[0]
+    warn(`${propagated.ready ? '版本已列出却查不到元数据，确认一下' : 'registry 上还没查到这个版本'}：${first}`)
+  } else {
     for (const line of view.stdout.trim().split('\n')) info(line)
     ok(`${PKG_NAME}@${PKG_VERSION} 已在 registry 上`)
   }
   const distTags = await run('npm', ['view', PKG_NAME, 'dist-tags', '--registry', opts.registry])
   if (distTags.code === 0) {
     info(`dist-tags: ${distTags.stdout.trim().replace(/\n/g, ' ')}`)
-    if (!distTags.stdout.includes(`${tag}: '${PKG_VERSION}'`) && !distTags.stdout.includes(`"${tag}": "${PKG_VERSION}"`)) {
-      warn(`dist-tag ${tag} 的指向看起来不是 ${PKG_VERSION}，确认一下`)
-    }
+    const points = distTags.stdout.includes(`${tag}: '${PKG_VERSION}'`) || distTags.stdout.includes(`"${tag}": "${PKG_VERSION}"`)
+    if (points) ok(`dist-tag ${tag} → ${PKG_VERSION}`)
+    else if (propagated.ready) {
+      warn(`版本已写入，但 dist-tag ${tag} 还没翻到 ${PKG_VERSION} —— 标签翻页通常再晚一点，手工确认：\n` +
+        `       npm view ${PKG_NAME} dist-tags --registry ${opts.registry}`)
+    } else warn(`dist-tag ${tag} 的指向看起来不是 ${PKG_VERSION}，确认一下`)
   }
 }
 
@@ -579,15 +666,32 @@ async function smokeTest() {
   //   2. 即便关掉冷静期，`latest` 标签在发布与冒烟之间也存在被改写的窗口，装确定版本
   //      才能保证验的确实是这次发出去的东西。
   const spec = `${PKG_NAME}@${PKG_VERSION}`
+
+  // 先等 registry 列出这个版本：装一个读副本还没给出的版本必然 E404，而那个失败
+  // 说的是读写窗口，不是包。--spec 里是精确版本，所以标签还没翻页不影响这一步。
+  const encoded = PKG_NAME.startsWith('@') ? PKG_NAME.replace('/', '%2f') : PKG_NAME
+  const propagated = await waitForVersion(encoded)
+  if (!propagated.ready) {
+    const why = propagated.reachable
+      ? `等了 ${(propagated.waitedMs / 1000).toFixed(0)}s registry 还没列出 ${PKG_VERSION}`
+      : `读不到 ${opts.registry}（${propagated.failure || '没有响应'}）`
+    warn(`${why} —— 跳过冒烟，稍后手工跑：`)
+    warn(`node scripts/release-lab.mjs npm --registry ${opts.registry} --spec ${spec} --keep`)
+    return { kept: false }
+  }
+
   const args = ['scripts/release-lab.mjs', 'npm', '--registry', opts.registry, '--spec', spec, '--keep']
   info(`$ node ${args.join(' ')}`)
   const result = await run(process.execPath, args, { inherit: true })
   if (result.code !== 0) {
-    warn('release-lab 没通过 —— registry 传播可能要等一会儿，或包本身有问题')
-    warn(`手工重试：node scripts/release-lab.mjs npm --registry ${opts.registry} --spec ${spec}`)
-    return
+    // 版本已经可查，所以这次失败不是传播窗口 —— 要么包本身有问题，要么本机环境
+    // （proxy / 代理证书 / 网络）。现场要留住，它带着 pnpm 的原始日志。
+    warn('release-lab 没通过 —— 版本已在 registry 上，所以不是传播问题')
+    warn(`手工重试：node scripts/release-lab.mjs npm --registry ${opts.registry} --spec ${spec} --keep`)
+    return { kept: true }
   }
   ok(`从 registry 安装 ${spec}、bundle 层、客户端半边全部通过`)
+  return { kept: false }
 }
 
 // ── 主流程 ──────────────────────────────────────────────────────────────────
@@ -616,11 +720,22 @@ async function main() {
 
   await verifyAfterPublish(publishResult.tag)
   if (opts.bump && startVersion !== PKG_VERSION) createGitTag(PKG_VERSION)
-  if (opts.smoke) await smokeTest()
+
+  // `.release-lab` 同时是 tarball 落地处与 release-lab 的现场，所以「删掉 tarball」
+  // 这条清理会把冒烟留下的日志一起删掉——现场因此只在成功时才清。
+  let keepLab = opts.keepTarball
+  if (opts.smoke) {
+    const smoke = await smokeTest()
+    keepLab = keepLab || smoke.kept
+  }
 
   process.stdout.write(`\n${green('发布完成')}：${PKG_NAME}@${PKG_VERSION}（dist-tag ${publishResult.tag}，发布者 ${user}）\n`)
   info(`用户安装：dsh plugin --profile web add ${PKG_NAME}`)
-  if (!opts.keepTarball && !opts.dryRunPack) {
+  if (opts.dryRunPack) {
+    info('tarball 未落盘（--dry-run-pack）')
+  } else if (keepLab) {
+    info(`保留 ${TARBALL_DIR}${opts.keepTarball ? '（--keep-tarball）' : '（冒烟失败，现场含 pnpm 日志）'}`)
+  } else {
     rmSync(TARBALL_DIR, { recursive: true, force: true })
     info('tarball 已清理（--keep-tarball 可保留）')
   }

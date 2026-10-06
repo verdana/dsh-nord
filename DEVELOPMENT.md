@@ -382,7 +382,15 @@ node scripts/publish-npm.mjs --publish --smoke
 - **`--bump` 只改 `package.json`**（`npm version --no-git-tag-version`），git commit 与 `v<版本>` tag 放在**发布成功之后**打——发布失败不该在仓库里留一个悬空的版本提交。
 - **`--set-license` / `--create-repo-field` 是幂等的**，只做那一处替换；`repository` 从 `git remote.origin.url` 推 owner/repo。
 - **凭据只在真要发布那一步碰**：`NPM_TOKEN` 环境变量会被写成仓库级 `.npmrc`，发布结束立刻删掉；核查阶段永远不写。
-- 发布后 `--smoke` 会直接调用 `release-lab.mjs npm --registry <registry> --spec <包名>@<刚发的版本>`，从 registry 真装一遍。这里刻意装**确定版本**而不是 `@latest`：冒烟紧跟发布，而冷静期按「发布满 24 小时」生效，用 `@latest` 会解到上一个版本却照样报「通过」；而且 `latest` 标签在发布与冒烟之间还有被改写的窗口。刚推上去可能有一两分钟传播延迟，失败不代表包有问题。
+- 发布后 `--smoke` 会直接调用 `release-lab.mjs npm --registry <registry> --spec <包名>@<刚发的版本>`，从 registry 真装一遍。这里刻意装**确定版本**而不是 `@latest`：冒烟紧跟发布，而冷静期按「发布满 24 小时」生效，用 `@latest` 会解到上一个版本却照样报「通过」；而且 `latest` 标签在发布与冒烟之间还有被改写的窗口。**发布后核对与冒烟都先等 registry 列出这个版本**（见下节），超时只 warning、不改变发布结论。
+
+### 发布后核对为什么要先等 registry 传播
+
+发布是**写**、核对与冒烟是**读**，而 registry 的读副本跟上写入有一段窗口。2026-10-06 发 `0.3.1` 实测：发布后几秒内 `npm view dsh-nord@0.3.1` 得 E404、`dist-tags` 仍是上一个版本，`dsh plugin add dsh-nord@0.3.1` 也必然 404（release-lab 已经把 registry 用 `npm_config_registry` 转给了安装，所以它查的是 npmjs，不是本机那个镜像）；约 1 分钟后 npmjs 能查到，镜像再晚一两分钟。把窗口当成「包有问题」报出去会把排查引到错的方向——那一次发布其实是成功的。
+
+所以 `--publish` 之后的两步都先有上限地轮询 packument 的 `versions`（每 5s，默认上限 180s；`--propagation-timeout <秒>` 可调，`0` = 只查一次），等到版本真的可查再核对 tarball / dist-tag，或再让 release-lab 去装。探测本身是直连 `fetch`，**不走** `~/.npmrc` 的 proxy，所以读不到 registry 时会单独说明是网络/代理，而不是说成读副本落后。超时只 warning 并给出手工命令；冒烟在超时时直接跳过——装一个读副本还没给出的版本必然失败，而那个失败说的不是包。
+
+顺带一处清理：`.release-lab` 既是 tarball 落地处、也是 release-lab 的现场，所以「删掉 tarball」那条收尾会把冒烟失败留下的 pnpm 日志一并删掉（曾经如此，现场只剩一句「现场在 .release-lab」）。现在只有成功时才清；失败会留住整个现场并在结尾写明路径。
 
 本机前提（脚本会检查并在缺的时候给出确切命令）：
 
