@@ -2,7 +2,7 @@
 
 **中文** | [English](https://github.com/verdana/dsh-nord/blob/main/README.en.md)
 
-给 [dsh](https://github.com/deepseek-ai/deepseek-harness) Web GUI 换一套 Nord：Nord 配色、一页自己的设置，以及 composer 下方的 DeepSeek 余额读数。dsh **0.2.1** 起字体与字号由 dsh 自己管理，0.1.7 / 0.2.0 上本插件仍提供字体替换。
+给 [dsh](https://github.com/deepseek-ai/deepseek-harness) Web GUI 换一套 Nord：Nord 配色、一页自己的设置，以及 composer 下方的 DeepSeek 余额读数。dsh **0.2.1** 起字体与字号由 dsh 自己管理，0.1.7 / 0.2.0 上本插件仍提供字体替换。本插件只支持 **0.1.7 / 0.2.0 / 0.2.1** 三代，`≤ 0.1.5` 自 0.4.0 起不再支持。
 
 ![Nord 主题（深色）](assets/01-theme.png)
 
@@ -26,7 +26,7 @@
 
 ## 环境要求
 
-- dsh **`0.2.1-rc.2`** —— 构建基线，实机实测；**`0.2.0-rc.2`** 与 **`0.1.7-rc.2`** 同样支持并各自实测过。
+- 支持的 dsh：**`0.2.1-rc.2`**（构建基线，实机实测）、**`0.2.0-rc.2`**、**`0.1.7-rc.2`**，各自实测过；**`≤ 0.1.5` 自 0.4.0 起不再支持**，详见[兼容性](#兼容性)。
 - 余额读数需要 `DEEPSEEK_API_KEY`（由 dsh 的 credentials 服务解析）。没有凭据时余额条显示错误文案，主题、字体、设置不受影响。
 
 ### 兼容性
@@ -36,9 +36,11 @@
 | `0.2.1` | 构建基线，实测 | 字体与字号由 dsh 自己的设置管理；插件不注入任何字体 |
 | `0.2.0` | 实测 | 插件提供字体替换（界面 / 代码字体可选） |
 | `0.1.7` | 实测 | 同上 |
-| `0.1.5` 及更早 | **0.4.0 起不再支持** | — |
+| `≤ 0.1.5` | **0.4.0 起不再支持**（含 `0.1.5-rc.1` / `rc.2` / `rc.3` 及更早全部版本） | — |
 
-0.4.0 移除了 0.1.5 一代的兼容代码：那一代的设置命名空间是另一套接口（Host `installSection` + 浏览器 `settingsScope`），代码为此维护两份 schema 与双份设置传输。仍在 0.1.5 上的用户请留在 0.3.x。更完整的版本记录见 [DEVELOPMENT.md](DEVELOPMENT.md#版本现实)。
+0.4.0 移除了 0.1.5 一代的兼容代码：那一代的设置命名空间是另一套接口（Host `installSection` + 浏览器 `settingsScope`），代码为此维护两份 schema 与双份设置传输。**dsh 发布很频繁，插件只保留当前基线加上两代回退，不对更老的版本做兼容。**
+
+这条下限同时写进了 `package.json` 的 `engines.dsh`（`>=0.1.7-0`）：dsh 0.2.1 及以后会在安装与启动时直接拒绝更老的宿主，并提示用 `dsh plugin allow-version` 给一个只对这个版本生效的豁免（仅供临时验证，不代表恢复兼容）。0.1.7 / 0.2.0 本身不读该字段，所以那两个版本仍照常可用；**0.1.5 也不读，因此它拦不住 0.4.x 的安装——别在 0.1.5 上升级，请留在插件 0.3.x。** 更完整的版本记录见 [DEVELOPMENT.md](DEVELOPMENT.md#版本现实)。
 
 ## 安装
 
@@ -80,6 +82,8 @@ git 安装需要你在 profile 的 `pnpm-workspace.yaml` 里为该包授权构�
 dsh plugin --profile web remove dsh-nord
 dsh plugin --profile web add dsh-nord@^0.4.0
 ```
+
+如果 dsh 还停在 `≤ 0.1.5`，别升到 0.4.x：先把 dsh 升到 0.1.7 或更新的支持版本，否则就留在插件 0.3.x（0.1.5 不会读 `engines.dsh`，拦不住这次安装）。
 
 装好后打开设置确认「Nord 主题」那一页还在：0.2.1 上字体组只剩一行说明，字体改在设置 → 通用 → 字体里选；0.2.0 / 0.1.7 上仍是插件自己的字体菜单，原有选择会沿用。
 

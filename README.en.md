@@ -2,7 +2,7 @@
 
 [中文](https://github.com/verdana/dsh-nord/blob/main/README.md) | **English**
 
-A Nord repaint for the [dsh](https://github.com/deepseek-ai/deepseek-harness) Web GUI: the Nord palette, a settings page of its own, and a DeepSeek balance readout under the composer. From dsh **0.2.1** the host manages fonts and sizes itself; on 0.1.7 / 0.2.0 this plugin still provides font replacement.
+A Nord repaint for the [dsh](https://github.com/deepseek-ai/deepseek-harness) Web GUI: the Nord palette, a settings page of its own, and a DeepSeek balance readout under the composer. From dsh **0.2.1** the host manages fonts and sizes itself; on 0.1.7 / 0.2.0 this plugin still provides font replacement. Only dsh **0.1.7 / 0.2.0 / 0.2.1** are supported; `≤ 0.1.5` has been unsupported since 0.4.0.
 
 ![Nord theme (dark)](assets/01-theme.png)
 
@@ -26,7 +26,7 @@ A Nord repaint for the [dsh](https://github.com/deepseek-ai/deepseek-harness) We
 
 ## Requirements
 
-- dsh **`0.2.1-rc.2`** —— the build baseline, tested on a live instance; **`0.2.0-rc.2`** and **`0.1.7-rc.2`** are supported and each tested as well.
+- Supported dsh: **`0.2.1-rc.2`** (the build baseline, tested on a live instance), **`0.2.0-rc.2`**, and **`0.1.7-rc.2`**, each tested as well; **`≤ 0.1.5` has been unsupported since 0.4.0** — see [Compatibility](#compatibility).
 - The balance readout needs `DEEPSEEK_API_KEY` (resolved through dsh's credentials service). Without credentials the bar shows an error message; theme, fonts, and settings are unaffected.
 
 ### Compatibility
@@ -36,9 +36,11 @@ A Nord repaint for the [dsh](https://github.com/deepseek-ai/deepseek-harness) We
 | `0.2.1` | Build baseline, tested | Font family and size are managed by dsh's own settings; the plugin injects none |
 | `0.2.0` | Tested | The plugin provides font replacement (interface / code fonts) |
 | `0.1.7` | Tested | Same as above |
-| `0.1.5` and older | **Unsupported since 0.4.0** | — |
+| `≤ 0.1.5` | **Unsupported since 0.4.0** (every `0.1.5-rc.1` / `rc.2` / `rc.3` and older) | — |
 
-0.4.0 removed the 0.1.5 compatibility code: that generation exposed the settings namespace through a different pair of interfaces (Host `installSection` plus browser `settingsScope`), which the plugin had to support with two schemas and two transports. Stay on 0.3.x if you are still on 0.1.5. The fuller version history is in [DEVELOPMENT.md](DEVELOPMENT.md#版本现实) (Chinese).
+0.4.0 removed the 0.1.5 compatibility code: that generation exposed the settings namespace through a different pair of interfaces (Host `installSection` plus browser `settingsScope`), which the plugin had to support with two schemas and two transports. **dsh releases very frequently, so the plugin only keeps the current baseline plus two generations of fallback and does not maintain compatibility with older releases.**
+
+The floor is also declared in `package.json` as `engines.dsh` (`>=0.1.7-0`): dsh 0.2.1 and newer refuse older hosts at install and startup, pointing at `dsh plugin allow-version` for an exact-version exemption (for temporary verification only; it does not restore compatibility). 0.1.7 / 0.2.0 do not read that field, so they keep working as before. **0.1.5 does not read it either, so it cannot block a 0.4.x install — do not upgrade on 0.1.5; stay on plugin 0.3.x.** The fuller version history is in [DEVELOPMENT.md](DEVELOPMENT.md#版本现实) (Chinese).
 
 ## Install
 
@@ -80,6 +82,8 @@ Uninstall: `dsh plugin --profile web remove dsh-nord`.
 dsh plugin --profile web remove dsh-nord
 dsh plugin --profile web add dsh-nord@^0.4.0
 ```
+
+If dsh is still on `≤ 0.1.5`, do not move to 0.4.x: upgrade dsh to 0.1.7 or newer first, or stay on plugin 0.3.x (0.1.5 does not read `engines.dsh`, so it will not block this install).
 
 After installing, open Settings and confirm the *Nord theme* page is there: on 0.2.1 the font group is one explanatory line and fonts are chosen in Settings → General → Fonts; on 0.2.0 / 0.1.7 the plugin's own font menus remain and keep their stored choices.
 

@@ -8,6 +8,9 @@
     "type": "git",
     "url": "git+https://github.com/verdana/dsh-nord.git"
   },
+  "engines": {
+    "dsh": ">=0.1.7-0"
+  },
   "keywords": [
     "dsh",
     "deepseek-harness",

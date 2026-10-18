@@ -258,3 +258,17 @@ return `html body{--dsw-font-family:${stacks.ui};--ds-font-family-code:${stacks.
 | `0.2.1-rc.2` | 全部通过 | 字体委托分支（插件不注入字体层） |
 
 `npm run typecheck` 0 错、`npm test` 34/34（0.2.1 基线）。
+
+### 7.4 支持下限改为机器可执行（2026-10-18 同日）
+
+用户明确「≤ 0.1.5 都不再支持，不必兼容远古版本」。除文档措辞外，`package.json` 增加：
+
+```json
+"engines": { "dsh": ">=0.1.7-0" }
+```
+
+- dsh 0.2.1+ 的 `evaluatePluginCompatibility()` 据此拒绝 0.1.5 及更早。用仓库实现实测：
+  `0.1.5-rc.3 → INCOMPATIBLE`；`0.1.7-rc.2` / `0.2.0-rc.2` / `0.2.1-rc.2` → compatible。
+- 区间下限必须写 `-0`：semver 下 `0.1.7-rc.2 < 0.1.7`，`>=0.1.7` 会把支持的最老预发布也拒掉。
+- 0.1.7 / 0.2.0 的装载器不读 `engines.dsh`，行为不变（实机 add 冒烟验证）。
+- 这推翻了第 4 节「不建议加 `engines.dsh`」的建议：那条针对的是「继续支持四代」；现在范围收窄为三代，加上下限才与文档一致，并让更老的宿主在安装/启动时直接得到明确拒绝与豁免指引。

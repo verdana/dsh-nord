@@ -129,7 +129,9 @@ div[data-slot="conversation.composer.dock"]:has(> [data-dsh-nord-bar]) {
 
 ## 版本现实
 
-本插件的**构建基线是 `0.2.1-rc.2`**，并**同时支持 `0.1.7-rc.2` 与 `0.2.0-rc.2`**；每一代都用两个探针实跑过（0.2.1 的 `verify-compat` 会话段还差 v4 workspace 夹具，模块加载器 / 样式表 / 字体委托 / token 抽样已通过；见「本地验证」）。`0.1.5` 及更早版本已不再支持——那一代没有 `configForms`，命名空间要靠 `installSection` + `settingsScope` 另一套接口，代码为此维护了两份 schema 与双份设置传输，而使用者已经为零。（`schemastery` 不用 dsh 的版本号，单独钉在 `3.18.5`，因为 `.volatile()` 是它才有的方法。）
+本插件的**构建基线是 `0.2.1-rc.2`**，并**同时支持 `0.1.7-rc.2` 与 `0.2.0-rc.2`**；每一代都用两个探针实跑过（0.2.1 的 `verify-compat` 会话段还差 v4 workspace 夹具，模块加载器 / 样式表 / 字体委托 / token 抽样已通过；见「本地验证」）。**`≤ 0.1.5`（含 `0.1.5-rc.1` / `rc.2` / `rc.3` 及更早）不再支持**——那一代没有 `configForms`，命名空间要靠 `installSection` + `settingsScope` 另一套接口，代码为此维护了两份 schema 与双份设置传输；而 dsh 发布频繁，没有必要为远古版本养一条并行分支。（`schemastery` 不用 dsh 的版本号，单独钉在 `3.18.5`，因为 `.volatile()` 是它才有的方法。）
+
+**支持下限同时写进 `package.json` 的 `engines.dsh: ">=0.1.7-0"`**：dsh 0.2.1 起安装/启动会按它判定兼容性（`engines.dsh` 存在时独占判定、忽略 `peerDependencies`；预发布版本参与区间比较，所以下限写成 `-0` 才能收下 `0.1.7-rc.2`），不满足时拒绝并提示 `dsh plugin allow-version` 豁免；0.1.7 / 0.2.0 的装载器不读这个字段，所以那两个版本照常可用（0.1.5 也不读，因此它拦不住 0.4.x 的安装——那里只能靠文档劝退，请用 0.3.x）。改这个区间前先拿 `packages/boot/app-boot/src/plugin-compatibility.ts` 的 `evaluatePluginCompatibility()` 对四个版本（`0.1.5-rc.3` 应被拒，`0.1.7-rc.2` / `0.2.0-rc.2` / `0.2.1-rc.2` 应通过）各跑一遍。
 
 | dsh | 设置命名空间 | 备注 |
 |---|---|---|
@@ -137,7 +139,7 @@ div[data-slot="conversation.composer.dock"]:has(> [data-dsh-nord-bar]) {
 | `0.2.0-rc.2` | 同上 | 配色表新增 8 枚 alias token |
 | `0.2.1-rc.2` | 同上 | 字体设置归 dsh 自己：字体 token 从 `:root` 挪到 `body`，General 新增字体与三档字号行。插件按页面启动图里的 Host release 识别该代，**完全不碰字体** |
 
-**基线跟着最新一代走**，理由很实际：旧代随时可能把插件依赖的东西删掉，而类型面看不见运行时早已走另一条分支的漂移。升基线时让 `npm run typecheck` 先暴露这类删除，比等用户在旧代上踩到更便宜。
+**基线跟着最新一代走**，理由很实际：旧代随时可能把插件依赖的东西删掉，而类型面看不见运行时早已走另一条分支的漂移。升基线时让 `npm run typecheck` 先暴露这类删除，比等用户在旧代上踩到更便宜。支持窗口约定为「当前基线 + 两代回退」（现在是 0.2.1 / 0.2.0 / 0.1.7），再老就删代码，不再平移兼容层。
 
 设置不再有跨代分支：0.1.7 起 `ctx.configForms.get(entryId)` 是唯一入口，字段表只有一份 schema，每个字段都带 `.volatile()`（否则整个命名空间会被 `describe()` 过滤掉）。
 
