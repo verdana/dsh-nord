@@ -12,9 +12,12 @@ import {
   FONT_PRESETS,
   INHERIT_FONT,
   isPreset,
+  bootReleaseVersion,
   fontStacks,
+  hostOwnsFonts,
   parseFamilies,
   presetPreview,
+  releaseTuple,
   SYSTEM_CODE_FONT,
   SYSTEM_FONT,
   SYSTEM_UI_FONT,
@@ -150,4 +153,42 @@ test('a non-preset row has no specimen stack of its own', () => {
   assert.equal(presetPreview(CUSTOM_FONT, 'ui'), '')
   assert.equal(isPreset(SYSTEM_FONT), false)
   assert.equal(isPreset('cascadia'), true)
+})
+
+// ── Host-owned fonts (dsh 0.2.1) ─────────────────────────────────────────────
+
+test('a release label parses to its major.minor.patch tuple', () => {
+  assert.deepEqual(releaseTuple('0.2.1-rc.2'), [0, 2, 1])
+  assert.deepEqual(releaseTuple('0.2.0-rc.2'), [0, 2, 0])
+  assert.deepEqual(releaseTuple('0.1.7-rc.2'), [0, 1, 7])
+  assert.deepEqual(releaseTuple(' 1.0.0 '), [1, 0, 0])
+  assert.equal(releaseTuple('nightly'), undefined)
+  assert.equal(releaseTuple(''), undefined)
+})
+
+test('host-owned fonts start at 0.2.1, prereleases included', () => {
+  for (const version of ['0.2.1-rc.2', '0.2.1', '0.2.2-rc.1', '0.3.0', '1.0.0']) {
+    assert.equal(hostOwnsFonts(version), true, version)
+  }
+  for (const version of ['0.1.5-rc.3', '0.1.7-rc.2', '0.2.0-rc.2', '0.2.0', undefined, 'unknown']) {
+    assert.equal(hostOwnsFonts(version), false, String(version))
+  }
+})
+
+test('the boot release is read from the published graph, and absent otherwise', () => {
+  const scope = globalThis
+  const saved = scope.__DSH_BOOT__
+  try {
+    delete scope.__DSH_BOOT__
+    assert.equal(bootReleaseVersion(), undefined)
+    scope.__DSH_BOOT__ = { rev: 'r1', entries: [], batches: [] }
+    assert.equal(bootReleaseVersion(), undefined)
+    scope.__DSH_BOOT__ = { rev: 'r1', release: { version: '0.2.1-rc.2', commit: 'abc' } }
+    assert.equal(bootReleaseVersion(), '0.2.1-rc.2')
+    scope.__DSH_BOOT__ = { release: { version: 3 } }
+    assert.equal(bootReleaseVersion(), undefined)
+  } finally {
+    if (saved === undefined) delete scope.__DSH_BOOT__
+    else scope.__DSH_BOOT__ = saved
+  }
 })

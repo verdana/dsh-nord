@@ -148,14 +148,14 @@ export function BalanceBar({ useStore, t, useProjection }: BalanceBarProps) {
   /**
    * Blend the readout into the composer's status row.
    *
-   * That row belongs to upstream, and its metrics moved between dsh 0.1.5 and
-   * 0.1.7: height 26 → 22, padding-top 4px → 0, font-size 13px → 12px. The fixed
-   * `margin-top` that lined the readout up on 0.1.5 therefore leaves it a point
-   * large and a pixel low on 0.1.7 — measured, not guessed: 0.0px of first-line
-   * difference on 0.1.5 against 1.0px on 0.1.7. Rather than key either number off
-   * a version, take them from the sibling's own first line: adopt its font
-   * metrics, then cancel whatever offset is left. That is what aligning it by eye
-   * amounts to, and it survives the next redesign of the row.
+   * That row belongs to upstream, and its metrics have moved between dsh
+   * releases: height, padding-top and font-size all changed across the
+   * generations this plugin supports, so a fixed `margin-top` always lines the
+   * readout up against one style and sits a point large and a pixel low against
+   * the next — measured, not guessed. Rather than key any number off a version,
+   * take the metrics from the sibling's own first line: adopt its font metrics,
+   * then cancel whatever offset is left. That is what aligning it by eye amounts
+   * to, and it survives the next redesign of the row.
    */
   useEffect(() => {
     const bar = rootRef.current

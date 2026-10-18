@@ -195,6 +195,63 @@ export interface FontStacks {
   readonly code: string
 }
 
+/** First DSH release whose theme owns font family and size settings itself. */
+const HOST_FONT_RELEASE: readonly [number, number, number] = [0, 2, 1]
+
+/**
+ * Parse the leading `major.minor.patch` of a release label.
+ *
+ * Prerelease and build suffixes are deliberately ignored: `0.2.1-rc.2` is the
+ * 0.2.1 generation for this decision, and it is the version that actually ships
+ * the font settings.
+ * @param version - release label such as `0.2.1-rc.2`.
+ * @returns the three numbers, or undefined when the label does not start with one.
+ */
+export function releaseTuple(version: string): readonly [number, number, number] | undefined {
+  const match = /^(\d+)\.(\d+)\.(\d+)/.exec(version.trim())
+  if (match === null) return undefined
+  return [Number(match[1]), Number(match[2]), Number(match[3])]
+}
+
+/**
+ * Whether the hosting DSH release owns font settings.
+ *
+ * 0.2.1 moved the two font tokens from `:root` to a `body` declaration and added
+ * its own Font family / Font size settings rows, so a plugin `:root` override can
+ * no longer reach the interface and the plugin's own font page would only fight
+ * the shell's settings. At and above that release this plugin leaves every font
+ * token alone.
+ * @param version - Host release label, or undefined when the shell publishes none.
+ * @returns true for 0.2.1 and newer; false for older, unknown or malformed labels.
+ */
+export function hostOwnsFonts(version: string | undefined): boolean {
+  if (version === undefined) return false
+  const tuple = releaseTuple(version)
+  if (tuple === undefined) return false
+  const [major, minor, patch] = tuple
+  const [hostMajor, hostMinor, hostPatch] = HOST_FONT_RELEASE
+  if (major !== hostMajor) return major > hostMajor
+  if (minor !== hostMinor) return minor > hostMinor
+  return patch >= hostPatch
+}
+
+/**
+ * The Host release label this page booted from, when the shell publishes one.
+ *
+ * dsh 0.2.1 puts `release: { version, commit }` into `window.__DSH_BOOT__`; older
+ * generations inject the same graph without it, which is exactly the signal this
+ * module needs — an absent release means the shell predates host-owned fonts.
+ * @returns the version string, or undefined outside the browser or without one.
+ */
+export function bootReleaseVersion(): string | undefined {
+  const graph = (globalThis as { __DSH_BOOT__?: unknown }).__DSH_BOOT__
+  if (typeof graph !== 'object' || graph === null) return undefined
+  const release = (graph as { release?: unknown }).release
+  if (typeof release !== 'object' || release === null) return undefined
+  const version = (release as { version?: unknown }).version
+  return typeof version === 'string' ? version : undefined
+}
+
 /**
  * Resolve both font tokens from one settings section.
  * @param config - the four stored font fields.

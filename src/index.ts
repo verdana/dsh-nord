@@ -12,8 +12,8 @@ import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import type {} from '@deepseek-ai/dsh-host-webserver'
 import type {} from '@deepseek-ai/dsh-settings'
 import { parseBalance, type BalanceFailure, type BalancePayload } from './balance.ts'
-import { BALANCE_PATH, NS, type Config as NordConfig } from './config.ts'
-import { Config, PlainConfig } from './schema.ts'
+import { BALANCE_PATH, type Config as NordConfig } from './config.ts'
+import { Config } from './schema.ts'
 
 export const name = 'dsh-nord'
 export { Config }
@@ -25,16 +25,11 @@ const API_KEY_REF = credentialRef('DEEPSEEK_API_KEY')
 const REQUEST_TIMEOUT_MS = 15_000
 
 /**
- * dsh 0.1.7 hands a `.volatile()` field over as a `Volatile<T>` wrapper whose
- * `.get()` answers the value standing right now — that is how a preference can
- * change without the plugin being remounted, and it is why `ui-theme` reads
- * `config.preference.get()` rather than `config.preference`.
- *
- * 0.1.5 has no notion of the marker in its cordis, cosmokit or `dsh-settings`,
- * but it still *resolves this entry through the schema this module exports* —
- * so the `config` reaching `apply` there carries wrappers too. Hence one
- * unwrapper for both, rather than a version test. A plain value never carries a
- * callable `get`.
+ * dsh hands a `.volatile()` field over as a `Volatile<T>` wrapper whose `.get()`
+ * answers the value standing right now — that is how a preference can change
+ * without the plugin being remounted, and it is why `ui-theme` reads
+ * `config.preference.get()` rather than `config.preference`. A plain value never
+ * carries a callable `get`, so one unwrapper covers both shapes.
  */
 function live<T>(value: T | { get(): T }): T {
   return typeof (value as { get?: unknown }).get === 'function' ? (value as { get(): T }).get() : value as T
@@ -48,82 +43,27 @@ function resolved(config: NordConfig): NordConfig {
 }
 
 /**
- * dsh 0.1.5's namespace registration, as this plugin used it.
- *
- * Declared structurally rather than read off `settings`: the declaration this
- * repo builds against — 0.2.0's `SettingsForms` — carries no `installSection` at
- * all, and the 0.1.5 package that did is not installed. The runtime shape it
- * serves is unchanged, so it is stated here the way `src/client/settings.ts`
- * states the 0.1.5 settings scope.
- */
-type LegacyInstallSection = (
-  this: unknown,
-  ctx: Context,
-  namespace: string,
-  schema: unknown,
-  base: unknown,
-  hooks: {
-    /** Hands this plugin the namespace's live source. */
-    setSource: (current: () => NordConfig) => void
-    /** Invoked after an accepted write. */
-    onChange: (value: NordConfig) => void
-  },
-) => void
-
-/**
  * Mount the settings namespace and the balance route.
  * @param ctx - Host plugin context.
  * @param config - composition entry used as the settings base layer.
  */
 export function apply(ctx: Context, config: NordConfig): void {
-  // Re-read per request. On 0.1.7 the wrapper handed to `apply` is stable and
-  // its `.get()` tracks accepted writes, so no hook is needed to stay live.
-  let source = (): NordConfig => resolved(config)
+  // Re-read per request. The wrapper handed to `apply` is stable and its `.get()`
+  // tracks accepted writes, so no hook is needed to stay live.
+  const source = (): NordConfig => resolved(config)
 
   ctx.inject(['settings'], (settingsCtx) => {
     const settings = settingsCtx.settings
 
-    // dsh 0.1.7 deleted `installSection`. Its `SettingsForms` projects the
-    // `Config` this module exports into one form per Loader entry, keyed by the
-    // profile entry id — this plugin's row id, `dsh-nord`, the same string the
-    // browser half asks `configForms.get()` for. There is nothing to install;
-    // what is left to say is that this plugin ships its OWN page, so the
-    // generated one must not be composed beside it.
+    // `SettingsForms` projects the `Config` this module exports into one form per
+    // Loader entry, keyed by the profile entry id — this plugin's row id,
+    // `dsh-nord`, the same string the browser half asks `configForms.get()` for.
+    // Nothing has to be installed; what is left to say is that this plugin ships
+    // its OWN page, so the generated one must not be composed beside it.
     //
-    // 0.2.0 dropped the method from its declarations as well, so the 0.1.5 branch
-    // is taken through {@link LegacyInstallSection} — a runtime shape this build
-    // cannot see — and the branch below it is the one every newer generation
-    // runs.
-    const { installSection } = settings as unknown as { installSection?: LegacyInstallSection }
-    if (typeof installSection === 'function') {
-      // `PlainConfig`, not `Config`: 0.1.5 resolves the namespace through whatever
-      // schema it is handed and keeps the result as the wire value, so the
-      // volatile marker would replace every field with a `{ get() {} }` shell the
-      // browser cannot decode — writes would persist and never come back. See
-      // `src/schema.ts`.
-      //
-      // The base layer is the UNWRAPPED composition entry, not `config` itself:
-      // 0.1.5's `describe()` does `structuredClone(registration.base)`, and a
-      // `Volatile` wrapper carries functions — cloning one throws `DataCloneError`,
-      // which empties the whole namespace list and leaves the browser half
-      // reporting `unavailable` with no clue as to why.
-      installSection.call(settings, ctx, NS, PlainConfig, resolved(config), {
-        // 0.1.5 hands back its own live source; unwrap it the same way, so a host
-        // that later grows the marker cannot leak a wrapper into `source()`.
-        setSource: (current) => { source = () => resolved(current()) },
-        // The route reads `source()` per request and the browser half reads its
-        // own scope snapshot, so an accepted change needs no rebuild here.
-        onChange: () => {},
-      })
-      return
-    }
-
-    const configure = (settings as unknown as {
-      configure?: (presentation: { auto?: boolean }, owner?: unknown) => () => void
-    }).configure
     // Owned by this plugin's fiber and disposed with it — the shape the shipped
     // preference owners use.
-    if (configure !== undefined) settingsCtx.effect(() => configure({ auto: false }, ctx.fiber))
+    settingsCtx.effect(() => settings.configure({ auto: false }, ctx.fiber))
   })
 
   ctx.inject(['webServer'], (webCtx) => {

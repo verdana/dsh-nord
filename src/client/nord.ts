@@ -291,11 +291,10 @@ export function tableStylesheet(): string {
  * reads as the same surface as the two pills beside it; its DeepSeek-only usage
  * row is the one extra, skinned as the link colour of that same skin.
  *
- * The first rule is the dock row. The composer dock is one outlet per slot, and
- * 0.1.5 lays that outlet's entries out in the composer column — every
- * contribution lands on its own line. The outlet is an addressable surface
- * (`div[data-slot]`), so one rule turns the outlet itself into the row 0.1.6
- * gives the dock natively. The `:has()` guard leaves the outlet untouched
+ * The first rule is the dock row. The composer dock is one outlet per slot and
+ * the outlet is an addressable surface (`div[data-slot]`), so one rule turns the
+ * outlet itself into the centered row that holds the shipped pills and this
+ * plugin's readout together. The `:has()` guard leaves the outlet untouched
  * whenever this plugin contributes no bar, and `!important` is required because
  * the shell writes `display: contents` as an inline style on the same element.
  * @returns stylesheet text for one `<style>` element.
@@ -316,11 +315,10 @@ export function surfaceStylesheet(): string {
     + 'min-width:min(300px,calc(100vw - 24px));max-width:min(440px,calc(100vw - 24px));padding:16px;'
     + 'border:0;border-radius:12px;background:var(--dsw-specific-menu);'
     // Upstream floats a popover on a PAIR of declarations: the menu fill plus its
-    // frost. In 0.1.7 the fill became translucent (`#43454a73`) and the frost moved
-    // into `--dsw-menu-backdrop-filter` (`blur(40px) saturate(150%)`) — copying the
-    // fill alone is what made this panel read as merely see-through. The token does
-    // not exist on 0.1.5, where the fill is opaque and the declaration falls back to
-    // its initial `none`, i.e. exactly what that version rendered before.
+    // frost. The fill turned translucent and the frost moved into
+    // `--dsw-menu-backdrop-filter` (`blur(40px) saturate(150%)`) — copying the fill
+    // alone is what makes a panel read as merely see-through. A host that ships no
+    // such token falls back to the initial `none`, i.e. an opaque fill with no blur.
     + 'backdrop-filter:var(--dsw-menu-backdrop-filter);'
     + '--dsw-elevation-stroke-color:var(--dsw-alias-border-l1);box-shadow:var(--dsw-elevation-prominent);'
     + 'font-size:12px;line-height:18px;color:var(--dsw-alias-label-secondary);cursor:default;}',

@@ -16,6 +16,11 @@ export interface NordSettingsState extends Config {
   served: boolean
   /** Failure code of the last rejected write, empty otherwise. */
   error: string
+  /**
+   * Whether the hosting DSH owns font settings. Fixed for the page's lifetime;
+   * carried in the store so the card can fold its font rows without re-probing.
+   */
+  hostFonts: boolean
 }
 
 /** Declared write surface of the settings card. */
@@ -26,11 +31,13 @@ type NordSettingsActions = {
 
 /**
  * Declares the settings-card state and write surface.
+ * @param hostFonts - whether the hosting DSH owns font settings, so the card
+ *   hides its own font rows.
  * @returns the store handle.
  */
-export function createNordSettingsStore(): EngineStoreHandle<NordSettingsState, NordSettingsActions> {
+export function createNordSettingsStore(hostFonts: boolean): EngineStoreHandle<NordSettingsState, NordSettingsActions> {
   return defineStore({
-    init: (): NordSettingsState => ({ ...DEFAULTS, revision: -1, writable: false, served: false, error: '' }),
+    init: (): NordSettingsState => ({ ...DEFAULTS, revision: -1, writable: false, served: false, error: '', hostFonts }),
     actions: {
       sync: (d, value, revision, writable, served) => {
         if (revision < d.revision) return

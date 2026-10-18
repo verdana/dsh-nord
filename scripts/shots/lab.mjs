@@ -12,7 +12,7 @@ import { spawn } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { chromium } from 'playwright-core'
 
 export const ROOT = 'D:\\deepseek-harness\\dsh-nord'
@@ -104,7 +104,8 @@ export function prepareHome(options = {}) {
   const slug = workspaceSlug(options.workspace)
   const sessionDir = join(HOME, 'sessions', slug, options.session.id)
   mkdirSync(sessionDir, { recursive: true })
-  copyFileSync(options.session.source, join(sessionDir, 'session.v3.jsonl.zstd'))
+  // 保留源文件名：0.2.1 的会话是 v4，旧版本是 v3，host 按文件名里的版本号读。
+  copyFileSync(options.session.source, join(sessionDir, basename(options.session.source)))
 
   // 侧栏的摘要来自投影缓存，缺了它工作区会列不出这个会话
   if (options.session.projection !== undefined && existsSync(options.session.projection)) {
@@ -116,7 +117,9 @@ export function prepareHome(options = {}) {
   mkdirSync(join(HOME, 'storages'), { recursive: true })
   writeFileSync(join(HOME, 'storages', 'workspace.json'), JSON.stringify({
     unit: { name: 'workspace', version: 2 },
-    global: { initialized: true, workspaceIds: ['w-shots'], archivedSessionIds: [] },
+    // 0.2.1 的 workspace 单元还带 `pinnedSessionIds`；按当前格式补齐，避免新版
+    // 解析时把整份单元当成旧文档处理。
+    global: { initialized: true, workspaceIds: ['w-shots'], archivedSessionIds: [], pinnedSessionIds: [] },
     tables: {
       workspaces: {
         'w-shots': {

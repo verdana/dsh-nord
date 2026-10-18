@@ -9,6 +9,11 @@ export const BALANCE_PATH = '/nord/balance'
 /**
  * The four stored fields one font preference is made of. Split out from
  * {@link Config} so `fonts.ts` can take exactly these and nothing else.
+ *
+ * Inert on dsh 0.2.1 and newer: that generation owns font settings itself, the
+ * browser half injects no font token there, and the settings card hides these
+ * rows behind one explanatory line. The fields stay in the schema so a document
+ * written by an older install still resolves and a downgrade keeps its choices.
  */
 export interface FontConfig {
   /** Interface stack: `system`, a preset id, or `custom`. See `fonts.ts`. */

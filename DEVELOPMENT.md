@@ -14,7 +14,7 @@ src/balance.ts             余额载荷类型 + 上游文档到载荷的投影
 src/usage.ts               「用量信息」链接的判定
 src/fonts.ts               字体预设目录 + 「存储选项 → CSS 家族列表」的解析与清洗
 src/client/index.ts        浏览器半边：主题层、字体、三枚样式表、设置页、余额轮询、两个 slot 注册
-src/client/settings.ts     设置传输的跨代适配（settingsScope / configForms 归一到一个接口）
+src/client/settings.ts     设置传输：把浏览器 configForms 归一成设置页消费的接口
 src/client/nord.ts         Nord 调色板（120 token）、字体 :root 规则、余额表面与宽表格补丁
 src/client/BalanceBar.tsx  余额读数与其明细面板
 src/client/NordSection.tsx 设置面板里本插件自己的一页
@@ -86,7 +86,7 @@ profile 里装的是 `link:`，直接指回本目录，所以构建产物一落�
 
 浏览器半边只要 `NS`、`DEFAULTS`、`BALANCE_PATH` 和 `Config` 这个类型，而 durable schema 必须 import `schemastery`。两者原先同住 `src/config.ts`，于是整个 schema 库被内联进 `lib/client.js`（当时占该产物 44%）。schema 挪进只被 Host 引用的 `src/schema.ts` 后，浏览器产物从 70.66 kB 降到 40.71 kB。客户端本来也不需要它：wire section 由 Host 序列化出去的 schema 校验。
 
-`Config` 与 `PlainConfig` 是同一张字段表构建的两份——差别只在有没有 `.volatile()` 标记，原因见「版本现实」。
+`Config` 是唯一一份 schema：每个字段都带 `.volatile()` 标记，原因见「版本现实」。
 
 ### 为什么没有 `dependencies` / `peerDependencies`
 
@@ -102,7 +102,7 @@ Host 半边在 `webServer` 上注册 `GET /nord/balance`，用 `ctx.credentials`
 
 ### 余额条为什么还需要一条 dock 规则
 
-`conversation.composer.dock` 里已经有官方的「轮次/步骤」pill，而 0.1.5 把这个槽位的每个贡献直接挂进 composer 竖列，于是同槽位的条目各占一行（0.1.6 才给 dock 加了独立的横向行）。槽位出口本身是可寻址节点（`<div data-slot="…" style="display: contents">`），所以插件只加一条规则，在余额条在场时把出口变成横向行：
+`conversation.composer.dock` 里已经有官方的「轮次/步骤」pill。槽位出口本身是可寻址节点（`<div data-slot="…" style="display: contents">`），所以插件只加一条规则，在余额条在场时把出口变成让几个 pill 并排的横向行：
 
 ```css
 div[data-slot="conversation.composer.dock"]:has(> [data-dsh-nord-bar]) {
@@ -129,17 +129,19 @@ div[data-slot="conversation.composer.dock"]:has(> [data-dsh-nord-bar]) {
 
 ## 版本现实
 
-本插件的**构建基线是 `0.2.0-rc.2`**，并**同时支持 `0.1.5-rc.3` 与 `0.1.7-rc.2`**；三代都由 `verify-compat` 与 `verify-settings` 实测过（`schemastery` 不用 dsh 的版本号，单独钉在 `3.18.4`，因为 `.volatile()` 是它才有的方法）。
+本插件的**构建基线是 `0.2.1-rc.2`**，并**同时支持 `0.1.7-rc.2` 与 `0.2.0-rc.2`**；每一代都用两个探针实跑过（0.2.1 的 `verify-compat` 会话段还差 v4 workspace 夹具，模块加载器 / 样式表 / 字体委托 / token 抽样已通过；见「本地验证」）。`0.1.5` 及更早版本已不再支持——那一代没有 `configForms`，命名空间要靠 `installSection` + `settingsScope` 另一套接口，代码为此维护了两份 schema 与双份设置传输，而使用者已经为零。（`schemastery` 不用 dsh 的版本号，单独钉在 `3.18.5`，因为 `.volatile()` 是它才有的方法。）
 
 | dsh | 设置命名空间 | 备注 |
 |---|---|---|
-| `0.1.5-rc.3` | Host `ctx.settings.installSection()` 写 `settings.yaml`；浏览器 `ctx.settingsScope.bind()` | 最老的一代，只作兼容目标 |
-| `0.1.7-rc.2` | Loader 从条目导出的 `Config` 自动派生，写 profile 的 `cordis.patch.yml`；浏览器 `ctx.configForms.get()` | `installSection` 与 `settingsScope` 都被删 |
-| `0.2.0-rc.2` | 同上 | `settingsScope` 连类型声明一起删净；配色表新增 8 枚 alias token |
+| `0.1.7-rc.2` | Loader 从条目导出的 `Config` 自动派生，写 profile 的 `cordis.patch.yml`；浏览器 `ctx.configForms.get()` | 支持的最老一代 |
+| `0.2.0-rc.2` | 同上 | 配色表新增 8 枚 alias token |
+| `0.2.1-rc.2` | 同上 | 字体设置归 dsh 自己：字体 token 从 `:root` 挪到 `body`，General 新增字体与三档字号行。插件按页面启动图里的 Host release 识别该代，**完全不碰字体** |
 
-**基线跟着最新一代走**，理由很实际：旧代随时可能把插件依赖的东西删掉。0.2.0 删 `settingsScope` 的声明时，钉在 `0.1.5-rc.3` 上的 `npm run typecheck` 对这件事完全看不见——而运行时早就走另一条分支了。基线升到 `0.2.0-rc.2` 时立刻报出四处错误，全在这一类东西上。
+**基线跟着最新一代走**，理由很实际：旧代随时可能把插件依赖的东西删掉，而类型面看不见运行时早已走另一条分支的漂移。升基线时让 `npm run typecheck` 先暴露这类删除，比等用户在旧代上踩到更便宜。
 
-**同一时刻只有一代声明能被加载**（两侧的 `SlotMap` 模块增强会撞车），所以「导入哪一代、声明哪一代」是这份代码里唯一的版本策略：现在导入 0.2.0、结构化声明 0.1.5 的 `settingsScope` 与 `installSection`（见 `src/client/settings.ts`、`src/index.ts`）。运行时按**形状**分流，不按版本号判断。
+设置不再有跨代分支：0.1.7 起 `ctx.configForms.get(entryId)` 是唯一入口，字段表只有一份 schema，每个字段都带 `.volatile()`（否则整个命名空间会被 `describe()` 过滤掉）。
+
+**字体是唯一的按版本判断处**（`src/client/host-fonts.ts` + `src/fonts.ts` 的 `hostOwnsFonts`）：0.2.1 把字体 token 从 `:root` 挪到 `body` 并自带字体设置，而这件事在类型上完全不可见；只看形状也分不干净（0.2.0 同样有 `theme` 服务，只是快照里没有 `fontFamilies`）。所以先读页面启动图里的 Host release（`window.__DSH_BOOT__.release.version`，0.2.1 才有），`>= 0.2.1` 即让位；没有 release 的页面再用「主题快照是否带 `fontFamilies`」作能力兜底。
 
 升级 dsh 的流程：
 
@@ -151,10 +153,11 @@ node scripts/shots/verify-compat.mjs
 node scripts/shots/verify-settings.mjs
 ```
 
-**三处类型与探针都看不见、升级时值得主动查的东西：**
+**四处类型与探针都看不见、升级时值得主动查的东西：**
 
 - **新增的配色 token。** 上游只往 `ui-theme/src/styles/design-platform.css` 里加，而探针只抽样 9 项，抽不到新加的。做法是拿两个 tag 比这份文件（`git diff dsh-v<旧>..dsh-v<新> -- packages/client/ui-theme/src/styles/design-platform.css`）：新增的 alias 若没被这层覆盖，就会露出非 Nord 的颜色。0.2.0 加了 8 枚，其中 4 枚靠 `var()` 间接命中、4 枚需要补。
-- **图标名。** ui-primitives 改过两轮名字（0.1.5 带尺寸后缀 `…14` → 0.1.7 去后缀 → 0.2.0 拆成 `…Regular` / `…Medium`），**没有任何一个名字三代通用**。`NordSection.tsx` 按「新→旧→本地兜底」解析，所以不会崩，但宿主重画时会静默退回兜底那份（退回时肉眼一样，是以后的隐患）。
+- **图标名。** ui-primitives 改过一次名字（0.1.7 的 `IconChevronDownOutline` → 0.2.0 拆成 `…Regular` / `…Medium`），两代之间没有一个名字通用。`NordSection.tsx` 按「新→旧→本地兜底」解析，所以不会崩，但宿主重画时会静默退回兜底那份（退回时肉眼一样，是以后的隐患）。
+- **body 级的字体 token。** 0.2.1 在 `ui-theme/src/styles/base.css:29-31` 的 `body` 上重新声明 `--dsw-font-family` / `--ds-font-family-code`（值引用新的 `--dsh-font-family-*-default`）。插件写 `:root` 的覆盖会被 body 自己的声明压掉：界面与代码字体**静默**退回上游默认栈，没有任何报错，而只读 `documentElement` 的旧探针会给出假绿灯。0.2.1 起插件整体让位（`src/client/host-fonts.ts`），探针按宿主 release 分支：宿主自管时断言「不注入字体层、body 不是插件栈、设置页只剩说明」，旧版才断言插件字体生效。
 - **那条宽表格补丁。** 它绑在上游「静止藏条、悬停显条」的做法上；上游若改了 `md-table-wide` 钩子或取消悬停切换，就要重新评估这条规则是删还是改写。
 
 ### 并排装另一个 dsh 版本
@@ -162,10 +165,10 @@ node scripts/shots/verify-settings.mjs
 `latest` 标签与最新版常常不是一回事，所以「插件在新版上还行不行」要拿另一个版本来问，而不是升级全局那份：
 
 ```sh
-node scripts/dsh-version-lab.mjs 0.1.7-rc.2                 # 装到 ~/.dsh-versions/<版本>
+node scripts/dsh-version-lab.mjs 0.2.1-rc.2                 # 装到 ~/.dsh-versions/<版本>
 node scripts/dsh-version-lab.mjs --list                     # 已经装了哪些
-node scripts/dsh-version-lab.mjs 0.1.7-rc.2 -- node scripts/shots/verify-compat.mjs
-node scripts/dsh-version-lab.mjs 0.1.7-rc.2 -- node scripts/shots/verify-settings.mjs
+node scripts/dsh-version-lab.mjs 0.2.1-rc.2 -- node scripts/shots/verify-compat.mjs
+node scripts/dsh-version-lab.mjs 0.2.1-rc.2 -- node scripts/shots/verify-settings.mjs
 ```
 
 **必须装在仓库外**：`pnpm add` 会顺着 `pnpm-workspace.yaml` 往上找到仓库根，把整棵新版本的依赖树链进本仓库的 `node_modules` 并重解析 lock（类型基线当场就变）。清场用 `npm ci`。两个 dsh 同时在跑靠 `DSH_HOME` 与端口分开；探针一侧只认 `DSH_BIN`（默认 PATH 上的 `dsh`），两个探针开场都会写明打的是哪一对版本。
@@ -176,10 +179,12 @@ node scripts/dsh-version-lab.mjs 0.1.7-rc.2 -- node scripts/shots/verify-setting
 
 | 探针 | 覆盖什么 |
 |---|---|
-| `verify-compat.mjs` | 插件站在哪些上游接口上：模块加载器、三枚样式表、字体 token、两套调色板各抽 9 项 token、dock 槽位与那条 `:has()` 规则、余额读数、明细面板、「用量信息」座位、Escape、零 console 报错。**升 dsh 之后先跑这个** |
-| `verify-settings.mjs` | 设置页与字体选择器：左栏入口与顺序、「通用」里已经没有本插件的行、独立页面的几何、两侧字体菜单、自定义串的取消 / 恶意串 / 正常串、写库落到哪一份文档 |
+| `verify-compat.mjs` | 插件站在哪些上游接口上：模块加载器、插件样式表、两套调色板各抽 9 项 token、dock 槽位与那条 `:has()` 规则、余额读数、明细面板、「用量信息」座位、Escape、零 console 报错。字体面按宿主分支：0.2.1+ 断言「不注入字体层、body 不是插件栈」，旧版断言插件字体生效。**升 dsh 之后先跑这个** |
+| `verify-settings.mjs` | 设置页与字体选择器：左栏入口与顺序、「通用」里已经没有本插件的行、独立页面的几何；字体面同样分支 —— 0.2.1+ 只断言委托说明（字体选择器不再出现），旧版跑完整字体菜单流程并核对写库的 profile patch |
 
 两处经验：探针都**等结果**而不是等固定时长（乐观写与过 wire 的写落地时刻不同）；判「在不在会话页」看 `[data-slot="conversation.composer.dock"]` 是否存在，而不是看页面像不像会话——空会话的 hero 页不渲染这个槽位。
+
+**0.2.1 的两处探针适配**：设置入口从侧栏底部按钮挪进了账号菜单（探针两处入口都试）；会话文件升到 v4，`lab.mjs` 按投影缓存里的 `formatVersion` 选会话文件、找不到旧夹具时退回真实 home 里的任一可用会话。但新版 workspace 存储仍可能丢弃合成工作区，`verify-compat` 的会话段（dock / 余额条 / 面板）因此可能报「会话夹具没列进侧栏」并打印侧栏原文 —— 这是夹具待补，不是插件回归；同一轮里模块加载器、插件样式表、字体委托、两套 token 抽样都在它之前已经通过。
 
 余额链路可以完全不碰真实账号地走通：
 
@@ -242,7 +247,7 @@ node scripts/release-lab.mjs --keep --no-boot     # 只查装卸，保留现场
 
 pnpm 11 起默认开启新版本冷静期（`minimumReleaseAge`，默认 24 小时）：发布不满一天的版本**不进标签解析的候选**，于是 `add dsh-nord@latest` 会静默装回上一个版本。三点要记住：
 
-- 冷静期**只影响标签解析**。显式范围（`@^0.3.0`）与精确版本（`@0.3.1`）不受影响，能直接装到刚发布的版本。
+- 冷静期**只影响标签解析**。显式范围（`@^0.4.0`）与精确版本（`@0.4.0`）不受影响，能直接装到刚发布的版本。
 - 覆盖它的键名是**连字符**的 `--config.minimum-release-age=<秒>`；camelCase 的 `--config.minimumReleaseAge` 会被**静默忽略**，`npm_config_minimum-release-age` 这类环境变量同样不生效。
 - 脚本因此提供 `--min-release-age <秒>`（`0` = 关掉），并在 npm 方式的输出里算出「冷静期过滤后实际会解析到哪个版本」。
 

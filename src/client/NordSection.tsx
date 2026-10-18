@@ -38,14 +38,12 @@ const CARET_SIZE = 14
 /**
  * The menu trigger's caret.
  *
- * ui-primitives has renamed its icon set twice: 0.1.5 spelled the size into the
- * name (`IconChevronDownOutline14`, a fill on a 14-unit viewBox), 0.1.7 dropped
- * the suffix and redrew the glyph as a 1px stroke on a 16-unit viewBox
- * (`IconChevronDownOutline`), and 0.2.0 split every glyph into two weights
- * (`IconChevronDownOutlineRegular` / `…Medium`). **No single name renders on all
- * three**, so resolve whichever this host ships and keep each version's own
- * drawing — newest first, because a host that ships both spellings is one that
- * is midway through a rename.
+ * ui-primitives has renamed its icon set once across the generations this plugin
+ * supports: 0.1.7 spells the glyph `IconChevronDownOutline`, and 0.2.0 split
+ * every glyph into two weights (`IconChevronDownOutlineRegular` / `…Medium`).
+ * Resolve whichever this host ships and keep each version's own drawing — newest
+ * first, because a host that ships both spellings is one that is midway through
+ * a rename.
  *
  * The last resort is a copy of the newest artwork rather than nothing: importing
  * a name the host does not export yields `undefined`, and passing that as a
@@ -57,7 +55,6 @@ const CARET_SIZE = 14
 const CaretDown: ComponentType<{ size?: number; className?: string }> =
   (primitives as unknown as Record<string, ComponentType<{ size?: number; className?: string }> | undefined>).IconChevronDownOutlineRegular
   ?? (primitives as unknown as Record<string, ComponentType<{ size?: number; className?: string }> | undefined>).IconChevronDownOutline
-  ?? (primitives as unknown as Record<string, ComponentType<{ size?: number; className?: string }> | undefined>).IconChevronDownOutline14
   ?? (() => (
     <svg width={CARET_SIZE} height={CARET_SIZE} viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <path d="M4 6L7.29289 9.29289C7.68342 9.68342 8.31658 9.68342 8.70711 9.29289L12 6" stroke="currentColor" strokeWidth={1} />
@@ -335,6 +332,7 @@ export function NordSection({ useStore, t, save }: NordSectionProps) {
   const uiFontCustom = useStore(s => s.uiFontCustom)
   const codeFont = useStore(s => s.codeFont)
   const codeFontCustom = useStore(s => s.codeFontCustom)
+  const hostFonts = useStore(s => s.hostFonts)
   const balanceEnabled = useStore(s => s.balanceEnabled)
   const refreshSeconds = useStore(s => s.refreshSeconds)
   const baseURL = useStore(s => s.baseURL)
@@ -387,39 +385,49 @@ export function NordSection({ useStore, t, save }: NordSectionProps) {
   return (
     <section style={PAGE_STYLE} {...{ [SETTINGS_ATTR]: '' }}>
       <h2 style={HEADING_STYLE}>{t('page.title')}</h2>
-      <p style={INTRO_STYLE}>{t('page.intro')}</p>
+      <p style={INTRO_STYLE}>{t(hostFonts ? 'page.introHostManaged' : 'page.intro')}</p>
 
       <h3 style={GROUP_STYLE}>{t('group.appearance')}</h3>
       {toggleRow('page.theme', 'page.themeHint', themeEnabled, 'themeEnabled')}
 
       <h3 style={GROUP_STYLE}>{t('group.font')}</h3>
-      {toggleRow('page.font', 'page.fontHint', fontEnabled, 'fontEnabled')}
-      <FontRow
-        t={t}
-        role="ui"
-        labelKey="page.uiFont"
-        hintKey="page.uiFontHint"
-        choice={uiFont}
-        custom={uiFontCustom}
-        stack={stacks.ui}
-        disabled={fontDisabled}
-        allowInherit={false}
-        onSelect={(id) => { void save('uiFont', id) }}
-        onCustom={(value) => { commitCustom('ui', value) }}
-      />
-      <FontRow
-        t={t}
-        role="code"
-        labelKey="page.codeFont"
-        hintKey="page.codeFontHint"
-        choice={codeFont}
-        custom={codeFontCustom}
-        stack={stacks.code}
-        disabled={fontDisabled}
-        allowInherit
-        onSelect={(id) => { void save('codeFont', id) }}
-        onCustom={(value) => { commitCustom('code', value) }}
-      />
+      {hostFonts ? (
+        // The host owns fonts from dsh 0.2.1 on: its Appearance section carries
+        // the Font family / Font size rows, and this plugin injects no font
+        // token at all. Offering a second control here would write settings that
+        // cannot reach the page, so the group states the delegation instead.
+        <p style={NOTE_STYLE}>{t('page.fontHostManaged')}</p>
+      ) : (
+        <>
+          {toggleRow('page.font', 'page.fontHint', fontEnabled, 'fontEnabled')}
+          <FontRow
+            t={t}
+            role="ui"
+            labelKey="page.uiFont"
+            hintKey="page.uiFontHint"
+            choice={uiFont}
+            custom={uiFontCustom}
+            stack={stacks.ui}
+            disabled={fontDisabled}
+            allowInherit={false}
+            onSelect={(id) => { void save('uiFont', id) }}
+            onCustom={(value) => { commitCustom('ui', value) }}
+          />
+          <FontRow
+            t={t}
+            role="code"
+            labelKey="page.codeFont"
+            hintKey="page.codeFontHint"
+            choice={codeFont}
+            custom={codeFontCustom}
+            stack={stacks.code}
+            disabled={fontDisabled}
+            allowInherit
+            onSelect={(id) => { void save('codeFont', id) }}
+            onCustom={(value) => { commitCustom('code', value) }}
+          />
+        </>
+      )}
 
       <h3 style={GROUP_STYLE}>{t('group.balance')}</h3>
       {toggleRow('page.balance', 'page.balanceHint', balanceEnabled, 'balanceEnabled')}

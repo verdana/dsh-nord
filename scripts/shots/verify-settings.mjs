@@ -13,7 +13,7 @@
  */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { FONT_PRESETS, presetPreview } from '../../lib/fonts.js'
+import { FONT_PRESETS, hostOwnsFonts, presetPreview } from '../../lib/fonts.js'
 import {
   dismissWelcome, ensureProfile, HOME, openPage, prepareHome, ROOT, sleep, startServer, stopServer,
 } from './lab.mjs'
@@ -70,7 +70,26 @@ try {
   await dismissWelcome(page)
   await sleep(2500)
 
-  await page.locator('button, [role="button"], a').filter({ hasText: /^设置$/ }).first().click()
+  // 宿主是否自管字体：两处分支都读它（字体行是否该隐藏、旧字体流程是否该跳过）。
+  // 判定信号与插件运行时一致：页面启动图里的 Host release。
+  const hostFonts = hostOwnsFonts(await page.evaluate(() => globalThis.__DSH_BOOT__?.release?.version))
+
+  // 设置入口在两代之间搬过家：更早的版本是侧栏底部的「设置」按钮，0.2.1 收进了
+  // 侧栏底部的账号菜单（按钮只剩 aria-label）。两条路都试，找不到再走快捷键。
+  const openSettings = async () => {
+    const direct = page.locator('button, [role="button"], a').filter({ hasText: /^设置$/ })
+    if (await direct.count() > 0) { await direct.first().click(); return }
+    const account = page.locator('button[aria-label*="账号"], button[title*="账号"]')
+    if (await account.count() > 0) {
+      await account.first().click()
+      await sleep(600)
+      const item = page.getByRole('menuitem', { name: /设置/ })
+      if (await item.count() > 0) { await item.first().click(); return }
+      await page.keyboard.press('Escape')
+    }
+    await page.keyboard.press('Control+,')
+  }
+  await openSettings()
   await waitFor(page, '设置面板', () => page.evaluate(() =>
     [...document.querySelectorAll('[role="dialog"]')].some((el) => el.innerText.includes('通用设置'))))
 
@@ -80,15 +99,18 @@ try {
   const nav = await navNames()
   console.log(`      左栏：${nav.join(' | ')}`)
   if (!nav.includes('Nord 主题')) throw new Error(`左栏没有「Nord 主题」：${JSON.stringify(nav)}`)
+  // 官方分区名两代之间改过（0.2.1 把「插件」写成「内置插件」），按包含匹配定位。
   for (const shipped of ['通用设置', '模型', '插件']) {
-    if (nav.indexOf('Nord 主题') < nav.indexOf(shipped)) {
+    const at = nav.findIndex((row) => row.includes(shipped))
+    if (at !== -1 && nav.indexOf('Nord 主题') < at) {
       throw new Error(`「Nord 主题」应排在官方分区「${shipped}」之后：${JSON.stringify(nav)}`)
     }
   }
   ok('左栏入口', nav.join(' / '))
 
   const bodyText = () => page.evaluate(() => document.querySelector('[role="dialog"]')?.innerText ?? '')
-  const LEAKED = ['Nord 配色', '底部余额条', '界面字体', 'API 地址']
+  // 「界面字体」只是本插件的行名；0.2.1 起上游「通用」自己也有字体设置，那一行不是泄漏。
+  const LEAKED = ['Nord 配色', '底部余额条', 'API 地址', ...(hostFonts ? [] : ['界面字体'])]
   await page.getByRole('button', { name: '通用设置', exact: true }).click()
   await sleep(500)
   const general = await bodyText()
@@ -121,162 +143,182 @@ try {
   ok('独立页面', `标题「${page1.heading}」，分组 ${page1.groups.join(' / ')}`)
   ok('整页落在内容列内', `高 ${Math.round(page1.rootHeight)}px / 列 ${page1.columnHeight}px，宽 ${Math.round(page1.rootWidth)}px，无滚动`)
 
-  // ── 旧 patch 的键集必须被 schema 默认值补全 ─────────────────────────────
-  const initial = await page.evaluate(tokens)
-  if (!initial.ui.startsWith("'Maple Mono'")) throw new Error(`默认界面字体不是 Maple Mono：${initial.ui}`)
-  if (!initial.code.includes('ui-monospace')) throw new Error(`默认代码字体没有等宽回退：${initial.code}`)
-  ok('旧 patch + 默认值 → 界面', initial.ui)
-  ok('旧 patch + 默认值 → 代码', initial.code)
-
-  const openFontMenu = async (name) => {
-    await page.getByRole('button', { name, exact: true }).click()
-    await waitFor(page, `${name} 菜单`, () => page.locator('[role="menu"]').count().then((n) => n > 0))
-    const rows = await page.locator('[role="menu"] [role="menuitem"]').allInnerTexts()
-    return rows
-  }
-  const pick = async (text) => {
-    await page.locator('[role="menu"] [role="menuitem"]').filter({ hasText: text }).first().click()
-    await sleep(900)
-  }
-  /**
-   * 菜单里每一行标签的实际字体族（取最内层的文本 span——Menu 自己还包了一层
-   * `.itemLabel`，那一层的字体是全局的，不是样本），以及触发按钮上的那一行。
-   */
-  const rowFonts = () => page.evaluate(() => ({
-    rows: [...document.querySelectorAll('[role="menu"] [role="menuitem"]')].map((row) => {
-      const inner = [...row.querySelectorAll('span')].filter((el) => el.children.length === 0 && el.innerText.trim() !== '')
-      return { text: row.innerText.trim(), font: getComputedStyle(inner.at(-1) ?? row).fontFamily }
-    }),
-    trigger: getComputedStyle(document.querySelector('button[aria-haspopup="menu"][aria-expanded="true"] span span') ?? document.body).fontFamily,
-  }))
-
-  // ── 界面字体：菜单内容与选择 ────────────────────────────────────────────
-  const uiRows = await openFontMenu('界面字体')
-  ok('界面字体菜单行数', uiRows.length)
-  console.log(`      ${uiRows.join(' | ')}`)
-  if (uiRows.length !== 10) throw new Error(`界面字体菜单应有 10 行（跟随系统 + 8 预设 + 自定义），实际 ${uiRows.length}`)
-  if (uiRows.includes('跟随界面字体')) throw new Error('界面字体菜单不应出现「跟随界面字体」')
-
-  // 每一行用它自己选的字体渲染：没装的话看到的就是回退，行本身就是样品。
-  // 计算值会被规范化（引号按需保留、单名去引号），所以两边都去掉引号再比。
-  const normalize = (value) => value.replace(/["']/g, '').toLowerCase()
-  const specimens = await rowFonts()
-  const rows = specimens.rows
-  for (const [index, preset] of FONT_PRESETS.entries()) {
-    const row = rows[index + 1]
-    if (row === undefined) throw new Error(`菜单少了第 ${index + 1} 行预设`)
-    const expected = normalize(presetPreview(preset.id, 'ui'))
-    if (!normalize(row.font).startsWith(expected)) {
-      throw new Error(`「${row.text}」没有用自己的字体渲染：\n  实际 ${row.font}\n  期望以 ${expected} 开头`)
+  // ── 字体面：0.2.1 起宿主自管字体，插件让位；更早的版本仍由插件提供 ──────────
+  if (hostFonts) {
+    // 委托断言：字体选择器不出现、说明文字在、字体样式表不注入、body 不是插件栈。
+    const delegation = await page.evaluate(() => {
+      const root = document.querySelector('[data-dsh-nord-settings]')
+      return {
+        menus: root === null ? -1 : root.querySelectorAll('button[aria-haspopup="menu"]').length,
+        text: root?.innerText ?? '',
+        sheet: document.querySelector('#dsh-nord-fonts')?.textContent ?? '',
+        body: getComputedStyle(document.body).getPropertyValue('--dsw-font-family').trim(),
+        bodyCode: getComputedStyle(document.body).getPropertyValue('--ds-font-family-code').trim(),
+      }
+    })
+    if (delegation.menus !== 0) throw new Error(`宿主自管字体时不应再有字体选择器：${delegation.menus} 个`)
+    if (!delegation.text.includes('字体与字号由 dsh 自己的设置管理')) {
+      throw new Error(`字体分组没有说明委托：${JSON.stringify(delegation.text.slice(0, 400))}`)
     }
+    if (delegation.sheet !== '') throw new Error(`不应再注入字体样式表：${delegation.sheet.slice(0, 200)}`)
+    if (delegation.body.includes('Maple Mono') || delegation.bodyCode.includes('Maple Mono')) {
+      throw new Error(`body 上仍是插件字体栈：${JSON.stringify(delegation)}`)
+    }
+    ok('字体委托给 dsh', `字体选择器 0 个，body = ${delegation.body.slice(0, 40)}…`)
+  } else {
+    // ── 旧 patch 的键集必须被 schema 默认值补全 ─────────────────────────────
+    const initial = await page.evaluate(tokens)
+    if (!initial.ui.startsWith("'Maple Mono'")) throw new Error(`默认界面字体不是 Maple Mono：${initial.ui}`)
+    if (!initial.code.includes('ui-monospace')) throw new Error(`默认代码字体没有等宽回退：${initial.code}`)
+    ok('旧 patch + 默认值 → 界面', initial.ui)
+    ok('旧 patch + 默认值 → 代码', initial.code)
+
+    const openFontMenu = async (name) => {
+      await page.getByRole('button', { name, exact: true }).click()
+      await waitFor(page, `${name} 菜单`, () => page.locator('[role="menu"]').count().then((n) => n > 0))
+      const rows = await page.locator('[role="menu"] [role="menuitem"]').allInnerTexts()
+      return rows
+    }
+    const pick = async (text) => {
+      await page.locator('[role="menu"] [role="menuitem"]').filter({ hasText: text }).first().click()
+      await sleep(900)
+    }
+    /**
+     * 菜单里每一行标签的实际字体族（取最内层的文本 span——Menu 自己还包了一层
+     * `.itemLabel`，那一层的字体是全局的，不是样本），以及触发按钮上的那一行。
+     */
+    const rowFonts = () => page.evaluate(() => ({
+      rows: [...document.querySelectorAll('[role="menu"] [role="menuitem"]')].map((row) => {
+        const inner = [...row.querySelectorAll('span')].filter((el) => el.children.length === 0 && el.innerText.trim() !== '')
+        return { text: row.innerText.trim(), font: getComputedStyle(inner.at(-1) ?? row).fontFamily }
+      }),
+      trigger: getComputedStyle(document.querySelector('button[aria-haspopup="menu"][aria-expanded="true"] span span') ?? document.body).fontFamily,
+    }))
+
+    // ── 界面字体：菜单内容与选择 ────────────────────────────────────────────
+    const uiRows = await openFontMenu('界面字体')
+    ok('界面字体菜单行数', uiRows.length)
+    console.log(`      ${uiRows.join(' | ')}`)
+    if (uiRows.length !== 10) throw new Error(`界面字体菜单应有 10 行（跟随系统 + 8 预设 + 自定义），实际 ${uiRows.length}`)
+    if (uiRows.includes('跟随界面字体')) throw new Error('界面字体菜单不应出现「跟随界面字体」')
+
+    // 每一行用它自己选的字体渲染：没装的话看到的就是回退，行本身就是样品。
+    // 计算值会被规范化（引号按需保留、单名去引号），所以两边都去掉引号再比。
+    const normalize = (value) => value.replace(/["']/g, '').toLowerCase()
+    const specimens = await rowFonts()
+    const rows = specimens.rows
+    for (const [index, preset] of FONT_PRESETS.entries()) {
+      const row = rows[index + 1]
+      if (row === undefined) throw new Error(`菜单少了第 ${index + 1} 行预设`)
+      const expected = normalize(presetPreview(preset.id, 'ui'))
+      if (!normalize(row.font).startsWith(expected)) {
+        throw new Error(`「${row.text}」没有用自己的字体渲染：\n  实际 ${row.font}\n  期望以 ${expected} 开头`)
+      }
+    }
+    ok('菜单行即样本', `${FONT_PRESETS.length} 行各自带自己的字体栈`)
+    ok('触发按钮用当前栈', specimens.trigger.slice(0, 34) + '…')
+
+    // 菜单是 portal 出来的，不能被设置面板的 overflow 裁掉
+    const menuBox = await page.locator('[role="menu"]').first().evaluate((el) => {
+      const r = el.getBoundingClientRect()
+      return { x: r.x, y: r.y, w: r.width, h: r.height }
+    })
+    const viewport = page.viewportSize()
+    const inside = menuBox.x >= 0 && menuBox.y >= 0
+      && menuBox.x + menuBox.w <= viewport.width && menuBox.y + menuBox.h <= viewport.height
+    if (!inside) throw new Error(`菜单被裁出视口：${JSON.stringify(menuBox)} vs ${JSON.stringify(viewport)}`)
+    ok('菜单完整落在视口内', `${Math.round(menuBox.w)}×${Math.round(menuBox.h)} @ ${Math.round(menuBox.x)},${Math.round(menuBox.y)}`)
+
+    await pick('JetBrains Mono')
+    // Wait for the outcome, not for a fixed delay: the accepted write settles
+    // over the Host wire before the token republishes, so a fixed sleep either
+    // races it or wastes a second.
+    await waitFor(page, '界面字体落到 JetBrains Mono', async () => (await page.evaluate(tokens)).ui.startsWith("'JetBrains Mono'"))
+    const jetbrains = await page.evaluate(tokens)
+    if (!jetbrains.ui.startsWith("'JetBrains Mono'")) throw new Error(`换成 JetBrains Mono 没生效：${jetbrains.ui}`)
+    if (jetbrains.code !== initial.code) throw new Error('改界面字体不该动到代码字体')
+    ok('界面字体 → JetBrains Mono', jetbrains.ui)
+
+    // ── 代码字体：独立选择，且有「跟随界面字体」 ────────────────────────────
+    const codeRows = await openFontMenu('代码字体')
+    ok('代码字体菜单行数', codeRows.length)
+    if (!codeRows.includes('跟随界面字体')) throw new Error('代码字体菜单缺「跟随界面字体」')
+    await pick('Cascadia Code')
+    await waitFor(page, '代码字体落到 Cascadia Code', async () => (await page.evaluate(tokens)).code.startsWith("'Cascadia Code'"))
+    const cascadia = await page.evaluate(tokens)
+    if (!cascadia.code.startsWith("'Cascadia Code'")) throw new Error(`换成 Cascadia Code 没生效：${cascadia.code}`)
+    if (cascadia.ui !== jetbrains.ui) throw new Error('改代码字体不该动到界面字体')
+    ok('代码字体 → Cascadia Code', cascadia.code)
+
+    await openFontMenu('代码字体')
+    await pick('跟随界面字体')
+    await waitFor(page, '代码字体跟随界面字体', async () => {
+      const now = await page.evaluate(tokens)
+      return now.code === now.ui
+    })
+    const inherited = await page.evaluate(tokens)
+    if (inherited.code !== inherited.ui) throw new Error('「跟随界面字体」没有把两个 token 对齐')
+    ok('代码字体 → 跟随界面字体', inherited.code.slice(0, 40) + '…')
+
+    // ── 自定义：打开后不输入就离开 = 取消，原字体不变 ────────────────────────
+    await openFontMenu('界面字体')
+    await pick('自定义')
+    const field = page.getByLabel('自定义字体栈')
+    await waitFor(page, '自定义输入框', () => field.count().then((n) => n > 0))
+    const beforeCancel = await page.evaluate(tokens)
+    await page.keyboard.press('Tab')
+    await sleep(800)
+    const afterCancel = await page.evaluate(tokens)
+    if (afterCancel.ui !== beforeCancel.ui) throw new Error(`空自定义被当成提交了：${afterCancel.ui}`)
+    if (await field.count() !== 0) throw new Error('取消后自定义字段没有收起')
+    ok('空自定义 = 取消', afterCancel.ui.slice(0, 30) + '…')
+
+    // ── 自定义：恶意串进不了样式表 ─────────────────────────────────────────
+    const hostile = 'Arial; } html { --pwn: 1px !important; } :root {'
+    await openFontMenu('界面字体')
+    await pick('自定义')
+    await waitFor(page, '自定义输入框', () => field.count().then((n) => n > 0))
+    await field.fill(hostile)
+    await page.keyboard.press('Tab')
+    await sleep(1200)
+
+    const injected = await page.evaluate(tokens)
+    const sheetText = await page.evaluate(sheet)
+    const braces = (sheetText.match(/[{}]/g) ?? []).length
+    const pwn = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--pwn').trim())
+    if (braces !== 2) throw new Error(`样式表里出现了 ${braces} 个花括号（应为一对）：${sheetText}`)
+    if (pwn !== '') throw new Error(`恶意串注入了 --pwn = ${pwn}`)
+    if (!injected.ui.includes('sans-serif')) throw new Error(`全部被拒后应回退到尾栈：${injected.ui}`)
+    ok('恶意自定义串被丢弃', `花括号 ${braces} 个，--pwn 为空，回落 ${injected.ui.slice(0, 32)}…`)
+
+    // ── 自定义：正常串生效 ─────────────────────────────────────────────────
+    await field.fill("'LXGW WenKai', Microsoft YaHei, sans-serif")
+    await page.keyboard.press('Tab')
+    // Submitting a custom stack is TWO serialized writes (the raw field, then the
+    // choice that activates it), and on 0.1.7 each settles over the wire before
+    // publishing — so wait for the outcome rather than for a fixed delay.
+    await waitFor(page, '自定义串生效', async () => (await page.evaluate(tokens)).ui.startsWith("'LXGW WenKai', 'Microsoft YaHei', sans-serif"))
+    const custom = await page.evaluate(tokens)
+    if (!custom.ui.startsWith("'LXGW WenKai', 'Microsoft YaHei', sans-serif")) {
+      throw new Error(`自定义串没按预期拼装：${custom.ui}`)
+    }
+    ok('自定义串生效', custom.ui)
+
+    // ── 落盘 ───────────────────────────────────────────────────────────────
+    // Every supported generation folds a plugin's preferences into the active
+    // profile's `cordis.patch.yml` (the dropped 0.1.5 was the last to write a
+    // `settings.yaml` section), so that is the one document to read.
+    const profilePatch = join(HOME, 'profiles', PROFILE, 'cordis.patch.yml')
+    if (!existsSync(profilePatch)) throw new Error(`设置没落到 profile patch：${profilePatch}`)
+    const stored = readFileSync(profilePatch, 'utf8')
+    const section = stored.slice(stored.indexOf('dsh-nord:') === -1 ? 0 : stored.indexOf('dsh-nord:')).split('\n').slice(0, 10).join('\n')
+    console.log('\n=== cordis.patch.yml ===')
+    console.log(section)
+    for (const expected of ['uiFont: custom', 'codeFont: inherit', 'uiFontCustom:']) {
+      if (!stored.includes(expected)) throw new Error(`cordis.patch.yml 里缺少 ${expected}`)
+    }
+    ok('落盘字段', 'uiFont / uiFontCustom / codeFont → cordis.patch.yml')
   }
-  ok('菜单行即样本', `${FONT_PRESETS.length} 行各自带自己的字体栈`)
-  ok('触发按钮用当前栈', specimens.trigger.slice(0, 34) + '…')
-
-  // 菜单是 portal 出来的，不能被设置面板的 overflow 裁掉
-  const menuBox = await page.locator('[role="menu"]').first().evaluate((el) => {
-    const r = el.getBoundingClientRect()
-    return { x: r.x, y: r.y, w: r.width, h: r.height }
-  })
-  const viewport = page.viewportSize()
-  const inside = menuBox.x >= 0 && menuBox.y >= 0
-    && menuBox.x + menuBox.w <= viewport.width && menuBox.y + menuBox.h <= viewport.height
-  if (!inside) throw new Error(`菜单被裁出视口：${JSON.stringify(menuBox)} vs ${JSON.stringify(viewport)}`)
-  ok('菜单完整落在视口内', `${Math.round(menuBox.w)}×${Math.round(menuBox.h)} @ ${Math.round(menuBox.x)},${Math.round(menuBox.y)}`)
-
-  await pick('JetBrains Mono')
-  // Wait for the outcome, not for a fixed delay: dsh 0.1.5 publishes the write
-  // optimistically, 0.1.7 publishes only after the Host settles it, so the same
-  // click lands at different moments on the two generations.
-  await waitFor(page, '界面字体落到 JetBrains Mono', async () => (await page.evaluate(tokens)).ui.startsWith("'JetBrains Mono'"))
-  const jetbrains = await page.evaluate(tokens)
-  if (!jetbrains.ui.startsWith("'JetBrains Mono'")) throw new Error(`换成 JetBrains Mono 没生效：${jetbrains.ui}`)
-  if (jetbrains.code !== initial.code) throw new Error('改界面字体不该动到代码字体')
-  ok('界面字体 → JetBrains Mono', jetbrains.ui)
-
-  // ── 代码字体：独立选择，且有「跟随界面字体」 ────────────────────────────
-  const codeRows = await openFontMenu('代码字体')
-  ok('代码字体菜单行数', codeRows.length)
-  if (!codeRows.includes('跟随界面字体')) throw new Error('代码字体菜单缺「跟随界面字体」')
-  await pick('Cascadia Code')
-  await waitFor(page, '代码字体落到 Cascadia Code', async () => (await page.evaluate(tokens)).code.startsWith("'Cascadia Code'"))
-  const cascadia = await page.evaluate(tokens)
-  if (!cascadia.code.startsWith("'Cascadia Code'")) throw new Error(`换成 Cascadia Code 没生效：${cascadia.code}`)
-  if (cascadia.ui !== jetbrains.ui) throw new Error('改代码字体不该动到界面字体')
-  ok('代码字体 → Cascadia Code', cascadia.code)
-
-  await openFontMenu('代码字体')
-  await pick('跟随界面字体')
-  await waitFor(page, '代码字体跟随界面字体', async () => {
-    const now = await page.evaluate(tokens)
-    return now.code === now.ui
-  })
-  const inherited = await page.evaluate(tokens)
-  if (inherited.code !== inherited.ui) throw new Error('「跟随界面字体」没有把两个 token 对齐')
-  ok('代码字体 → 跟随界面字体', inherited.code.slice(0, 40) + '…')
-
-  // ── 自定义：打开后不输入就离开 = 取消，原字体不变 ────────────────────────
-  await openFontMenu('界面字体')
-  await pick('自定义')
-  const field = page.getByLabel('自定义字体栈')
-  await waitFor(page, '自定义输入框', () => field.count().then((n) => n > 0))
-  const beforeCancel = await page.evaluate(tokens)
-  await page.keyboard.press('Tab')
-  await sleep(800)
-  const afterCancel = await page.evaluate(tokens)
-  if (afterCancel.ui !== beforeCancel.ui) throw new Error(`空自定义被当成提交了：${afterCancel.ui}`)
-  if (await field.count() !== 0) throw new Error('取消后自定义字段没有收起')
-  ok('空自定义 = 取消', afterCancel.ui.slice(0, 30) + '…')
-
-  // ── 自定义：恶意串进不了样式表 ─────────────────────────────────────────
-  const hostile = 'Arial; } html { --pwn: 1px !important; } :root {'
-  await openFontMenu('界面字体')
-  await pick('自定义')
-  await waitFor(page, '自定义输入框', () => field.count().then((n) => n > 0))
-  await field.fill(hostile)
-  await page.keyboard.press('Tab')
-  await sleep(1200)
-
-  const injected = await page.evaluate(tokens)
-  const sheetText = await page.evaluate(sheet)
-  const braces = (sheetText.match(/[{}]/g) ?? []).length
-  const pwn = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--pwn').trim())
-  if (braces !== 2) throw new Error(`样式表里出现了 ${braces} 个花括号（应为一对）：${sheetText}`)
-  if (pwn !== '') throw new Error(`恶意串注入了 --pwn = ${pwn}`)
-  if (!injected.ui.includes('sans-serif')) throw new Error(`全部被拒后应回退到尾栈：${injected.ui}`)
-  ok('恶意自定义串被丢弃', `花括号 ${braces} 个，--pwn 为空，回落 ${injected.ui.slice(0, 32)}…`)
-
-  // ── 自定义：正常串生效 ─────────────────────────────────────────────────
-  await field.fill("'LXGW WenKai', Microsoft YaHei, sans-serif")
-  await page.keyboard.press('Tab')
-  // Submitting a custom stack is TWO serialized writes (the raw field, then the
-  // choice that activates it), and on 0.1.7 each settles over the wire before
-  // publishing — so wait for the outcome rather than for a fixed delay.
-  await waitFor(page, '自定义串生效', async () => (await page.evaluate(tokens)).ui.startsWith("'LXGW WenKai', 'Microsoft YaHei', sans-serif"))
-  const custom = await page.evaluate(tokens)
-  if (!custom.ui.startsWith("'LXGW WenKai', 'Microsoft YaHei', sans-serif")) {
-    throw new Error(`自定义串没按预期拼装：${custom.ui}`)
-  }
-  ok('自定义串生效', custom.ui)
-
-  // ── 落盘 ───────────────────────────────────────────────────────────────
-  // Which document holds a plugin's settings moved between generations: dsh
-  // 0.1.5 writes a `settings.yaml` section, 0.1.7 dropped that file and folds
-  // every preference into the active profile's `cordis.patch.yml`. Read
-  // whichever this instance actually keeps, and report which one it was.
-  const documents = [
-    ['settings.yaml', join(HOME, 'settings.yaml')],
-    ['cordis.patch.yml', join(HOME, 'profiles', PROFILE, 'cordis.patch.yml')],
-  ].filter(([, path]) => existsSync(path))
-  if (documents.length === 0) throw new Error('既没有 settings.yaml 也没有 profile patch，设置没落到任何地方')
-  const stored = documents.map(([, path]) => readFileSync(path, 'utf8')).join('\n')
-  const section = stored.slice(stored.indexOf('dsh-nord:') === -1 ? 0 : stored.indexOf('dsh-nord:')).split('\n').slice(0, 10).join('\n')
-  console.log(`\n=== ${documents.map(([name]) => name).join(' + ')} ===`)
-  console.log(section)
-  for (const expected of ['uiFont: custom', 'codeFont: inherit', 'uiFontCustom:']) {
-    if (!stored.includes(expected)) throw new Error(`${documents.map(([name]) => name).join(' + ')} 里缺少 ${expected}`)
-  }
-  ok('落盘字段', `uiFont / uiFontCustom / codeFont → ${documents.map(([name]) => name).join(' + ')}`)
 
   if (problems.length > 0) throw new Error(`页面报错：\n${problems.join('\n')}`)
   ok('页面无 console 报错', problems.length)

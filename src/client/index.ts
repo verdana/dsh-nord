@@ -15,6 +15,7 @@ import { isBalanceFailure, type BalanceFailure, type BalancePayload } from '../b
 import { BALANCE_PATH, DEFAULTS, NS, type Config } from '../config.ts'
 import { fontStacks } from '../fonts.ts'
 import { BalanceBar } from './BalanceBar.tsx'
+import { detectHostFonts } from './host-fonts.ts'
 import { en, LOCALE_NS, zh } from './locales.ts'
 import { FONT_STYLE_ID, fontStylesheet, nordTokens, SECTION_ID, SECTION_ORDER, SURFACE_STYLE_ID, surfaceStylesheet, TABLE_STYLE_ID, tableStylesheet, TOKEN_SOURCE } from './nord.ts'
 import { NordSection } from './NordSection.tsx'
@@ -29,12 +30,10 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 }
 
 /**
- * Required services. The settings transport is deliberately NOT listed: an
- * entry's `inject` is a hard activation gate, and the service carrying it is
- * named `settingsScope` on dsh 0.1.5-rc.3 and `configForms` on 0.1.7-rc.2 —
- * listing either breaks the other, and listing both stalls on whichever is
- * missing (the shell reports `pending (waiting for service: …)` and runs
- * nothing). {@link mountSettings} resolves it through an optional injection.
+ * Required services. The settings transport (`configForms`) is deliberately NOT
+ * listed: an entry's `inject` is a hard activation gate — a shell assembled
+ * without the settings UI would report `pending (waiting for service: …)` and
+ * run nothing. {@link mountSettings} resolves it through an optional injection.
  */
 export const inject = ['theme', 'slots', 'locale']
 
@@ -50,7 +49,10 @@ const REQUEST_TIMEOUT_MS = 20_000
  * @param ctx - Client root context.
  */
 export function apply(ctx: ClientContext): void {
-  const settingsStore = createNordSettingsStore()
+  // One decision per page: whether this dsh owns font settings and this plugin
+  // must stay out of the font tokens entirely. See `host-fonts.ts`.
+  const hostFonts = detectHostFonts(ctx)
+  const settingsStore = createNordSettingsStore(hostFonts)
   const balanceStore = createNordBalanceStore()
   /** Bound once: repeat binds return the same function, and the nav thunk reads it. */
   const t = ctx.locale.bind(LOCALE_NS)
@@ -68,18 +70,24 @@ export function apply(ctx: ClientContext): void {
     // as `var(--dsw-font-family)`, so a body-level token override cannot reach it.
     // The rule is rewritten from the resolved stacks on every accepted write, and
     // emptied — not merely left stale — while the layer is off.
-    ctx.effect(() => {
-      const element = document.createElement('style')
-      element.id = FONT_STYLE_ID
-      document.head.append(element)
-      const sync = (): void => {
-        const value = effective()
-        element.textContent = value.fontEnabled ? fontStylesheet(fontStacks(value)) : ''
-      }
-      const unsubscribe = settings.subscribe(sync)
-      sync()
-      return () => { unsubscribe(); element.remove() }
-    }, 'dsh-nord: font stacks')
+    //
+    // dsh 0.2.1 declares the two tokens on `body` and ships its own font settings,
+    // so on that generation this layer is never mounted: the shell owns fonts and
+    // the settings card says so instead of offering the choice again.
+    if (!hostFonts) {
+      ctx.effect(() => {
+        const element = document.createElement('style')
+        element.id = FONT_STYLE_ID
+        document.head.append(element)
+        const sync = (): void => {
+          const value = effective()
+          element.textContent = value.fontEnabled ? fontStylesheet(fontStacks(value)) : ''
+        }
+        const unsubscribe = settings.subscribe(sync)
+        sync()
+        return () => { unsubscribe(); element.remove() }
+      }, 'dsh-nord: font stacks')
+    }
 
     // A second `<style>` carries the balance surfaces: the dock row that puts the
     // readout beside the shipped stats pill, the readout's own skin, and its
