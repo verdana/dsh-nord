@@ -207,7 +207,15 @@ npm run release                              # 真发布（= ... --publish）
 npm run release -- --bump patch --smoke      # 升版发布 + 从 registry 冒烟装一遍
 ```
 
-经 `npm run` 传参要放在 `--` 之后，否则 npm 会把参数当成自己的配置项。
+经 `npm run` 传参要放在 `--` 之后，否则 npm 会把参数当成自己的配置项。**PowerShell 里还有一个额外的坑**：`npm` 解析到的是 scoop/npm 生成的 `npm.ps1` shim，`--` 会在 PowerShell 这一层被吞掉，npm 收不到分隔符；npm 12 起不再只是警告，而是把 `--bump` 当未知配置直接报 `EUNKNOWNCONFIG`。改用 `.cmd` shim 或直接调脚本：
+
+```sh
+npm.cmd run release -- --bump patch --smoke                    # PowerShell 推荐：参数原样到达
+cmd /c "npm run release -- --bump patch --smoke"               # 或者交给 cmd.exe
+node scripts/publish-npm.mjs --publish --bump patch --smoke     # 或者绕开 npm，等价于 npm run release
+```
+
+`cmd.exe` 里原来的 `npm run release -- ...` 不受影响；`npm run release:check` 这种不带参数的写法两种 shell 都能用。
 
 | # | 闸门 | 不过时的含义 |
 |---|---|---|

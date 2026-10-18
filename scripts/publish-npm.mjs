@@ -38,6 +38,10 @@
  *   npm run release -- --smoke
  *   npm run release -- --bump patch --smoke
  *
+ * PowerShell 里 `npm` 解析到的是 npm.ps1 shim，`--` 会在 shim 层被 PowerShell 吞掉，
+ * npm 12 起会直接报 EUNKNOWNCONFIG。改用 `npm.cmd run release -- ...`，或者绕开 npm
+ * 直接 `node scripts/publish-npm.mjs --publish ...`。
+ *
  * CI 里用 NPM_TOKEN 环境变量即可，脚本会临时写一个仓库级 .npmrc 并在结尾删掉。
  */
 
@@ -167,6 +171,9 @@ function printHelp() {
   npm run release:check                             # 只核查
   npm run release -- --smoke                        # 发布；npm run release 已带 --publish
   npm run release -- --bump patch --smoke           # 升版发布
+  PowerShell 里 npm 是 npm.ps1 shim，-- 会被吞掉（npm 12 报 EUNKNOWNCONFIG）:
+  npm.cmd run release -- --bump patch --smoke       # 推荐
+  node scripts/publish-npm.mjs --publish --bump patch --smoke   # 或绕开 npm
 
 本机前提（脚本会检查，缺了会给出确切命令）:
   npm login --registry ${PUBLIC_REGISTRY}
