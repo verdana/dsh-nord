@@ -1,6 +1,6 @@
 {
   "name": "dsh-nord",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Nord theme, a settings row, and a DeepSeek balance readout with a detail panel for the dsh Web GUI. Selectable font stacks on dsh before 0.2.1; newer hosts own their font settings and this plugin steps aside.",
   "type": "module",
   "license": "MIT",
