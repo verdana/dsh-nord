@@ -5,3 +5,4 @@ pnpm-workspace.yaml
 *.tgz
 .release-lab/
 .shot-lab/
+.dsh-ops-*
