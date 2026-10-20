@@ -8,7 +8,7 @@ A Nord repaint for the [dsh](https://github.com/deepseek-ai/deepseek-harness) We
 
 ## Features
 
-- **Nord palette** —— 120 design tokens (85 semantic aliases, 10 named surfaces, 25 raw-scale patches), one set for light and one for dark, following dsh's own *Appearance* setting. No hard-coded colors, no DOM surgery, and uninstalling restores everything.
+- **Nord palette** —— 132 design tokens (93 semantic aliases, 10 named surfaces, 29 raw-scale patches), one set for light and one for dark, following dsh's own *Appearance* setting. No hard-coded colors, no DOM surgery, and uninstalling restores everything.
 - **Selectable fonts** —— Interface font and code font are chosen separately: follow the system, one of eight presets (Maple Mono, JetBrains Mono, Cascadia Code, Fira Code, Sarasa Gothic, LXGW WenKai, HarmonyOS Sans, MiSans), or your own CSS `font-family` string. A preset is a full fallback stack, so a family you don't have installed drops through to the next one, with CJK fallbacks appended by the plugin; every row in the dropdown renders in its own font, so you see the real result before you pick it. The UI font size still derives from dsh's *Font size* setting.
 
   > Starting with dsh **0.2.1**, the host ships its own font and size settings (Settings → General → Fonts), and this plugin steps aside: it injects no font stylesheet at all and the settings page's font group keeps a single explanatory line. On older supported hosts (0.1.7 / 0.2.0) the plugin still provides font replacement.

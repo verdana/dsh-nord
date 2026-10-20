@@ -56,7 +56,9 @@ profile 里装的是 `link:`，直接指回本目录，所以构建产物一落�
 
 官方的 `ThemeRuntime.register()` + `setTheme()` 对第三方主题是不完整的：`ui-theme` 的设置 schema 只接受 `light | dark | system`，第三方 theme id 存不进去，而 `adopt()` 会在设置变化时把内存偏好打回内置值。`overrideTokens(source, tokens)` 是官方为此留的入口——把一层 token 叠在当前主题之上，移除即还原，`composeActive` 按当前 `colorScheme` 自动挑 `light` / `dark`。
 
-覆盖分三层共 120 项：**85 个 `--dsw-alias-*`**（官方语义层）、**10 个 `--dsw-specific-*`**（侧边栏 / composer / 选择器这些具名表面）、**25 个 `--dsw-static-*`**（补丁）。第三层是必需的：有一批组件（计划卡、交付物、指南正文、文件类型图标、加载渐变）绕过 alias 直接读静态色阶，官方浅色把这些取成近白，在 Nord 画布上就是一个白框——只覆盖 alias 治不了。
+覆盖分三层共 132 项：**93 个 `--dsw-alias-*`**（官方语义层）、**10 个 `--dsw-specific-*`**（侧边栏 / composer / 选择器这些具名表面）、**29 个 `--dsw-static-*`**（补丁）。第三层是必需的：有一批组件（计划卡、交付物、指南正文、文件类型图标、加载渐变）绕过 alias 直接读静态色阶，官方浅色把这些取成近白，在 Nord 画布上就是一个白框——只覆盖 alias 治不了。
+
+浅色里需要 4.5:1 的文字与填充对（链接、主按钮、error）用 `color-mix` 把官方色压一档：`FROST_STRONG` 等四个常量，解析值与比值写在常量旁。差集里上游写死或走中性色的 `file-diff-*`、`state-idle`、`menu-icon` 单独补。Aurora 的 success/warn 保持官方粉彩：它们在浅色下低于 AA，但同一个 token 还要给常暗 toast 用，调暗会牺牲 toast，故记录为取舍而不是改写。
 
 `--dsw-specific-menu`（通用浮层底色）**故意不覆盖**：它被 11 个官方包当通用底色用，改了会把所有官方菜单一起改掉。
 

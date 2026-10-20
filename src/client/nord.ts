@@ -34,10 +34,23 @@ const P = {
   /**
    * One step between nord3 and nord4. The official scale jumps from #4C566A to
    * #D8DEE9, which leaves caption and dimmed text unreadable on a dark
-   * background; every alias below that needs a mid neutral uses this instead.
+   * background; every dark-mode alias below that needs a mid neutral uses this
+   * instead. #8E9AAD reaches 3.0:1 on nord2 and 2.6:1 on nord3 (the previous
+   * #7B88A1 stopped at 2.4 and 2.1) while staying 4.4:1 on nord0.
    */
-  faint: '#7B88A1',
+  faint: '#8E9AAD',
 } as const
+
+/**
+ * Light-mode shades for pairs that must hold 4.5:1. The palette offers no
+ * light-safe frost or Aurora (nord10 on nord6 is 3.5:1 and the pastels are
+ * worse), so these mix the official rung with polar night — Nord's guidelines
+ * allow shading. The resolved hex and the ratio it buys are noted for review.
+ */
+const FROST_STRONG = 'color-mix(in srgb, #5E81AC 70%, #2E3440)' // #506A8C — 4.83:1 on nord6
+const FROST_PRESSED = 'color-mix(in srgb, #5E81AC 60%, #2E3440)' // #4B6281 — 5.41:1 on nord6
+const ERROR_TEXT_LIGHT = 'color-mix(in srgb, #BF616A 75%, #2E3440)' // #9B5660 — 4.70:1 on nord6
+const ERROR_TEXT_DARK = 'color-mix(in srgb, #BF616A 65%, #ECEFF4)' // #CF939A — 4.92:1 on nord0
 
 /** Layer identity for the token override the theme service stacks. */
 export const TOKEN_SOURCE = 'dsh-nord'
@@ -110,7 +123,7 @@ const TOKENS: readonly (readonly [name: string, light: string, dark: string])[] 
   // Brand accent: Nord frost.
   ['--dsw-alias-brand-primary', P.nord10, P.nord8],
   ['--dsw-alias-brand-primary-invert', P.nord6, P.nord0],
-  ['--dsw-alias-brand-text', P.nord10, P.nord8],
+  ['--dsw-alias-brand-text', FROST_STRONG, P.nord8],
   ['--dsw-alias-brand-primary-new-colorprimary-new-color', P.nord10, P.nord8],
 
   // Buttons.
@@ -121,12 +134,12 @@ const TOKENS: readonly (readonly [name: string, light: string, dark: string])[] 
   ['--dsw-alias-button-ghost-active-border', P.nord9, P.nord9],
   ['--dsw-alias-button-ghost-active-fill', P.nord5, P.nord2],
   ['--dsw-alias-button-ghost-active-hover', P.nord4, P.nord3],
-  ['--dsw-alias-button-info-fill', P.nord10, P.nord8],
-  ['--dsw-alias-button-info-hover', P.nord9, P.nord7],
+  ['--dsw-alias-button-info-fill', FROST_STRONG, P.nord8],
+  ['--dsw-alias-button-info-hover', FROST_PRESSED, P.nord7],
   ['--dsw-alias-button-primary-dimmed', P.nord4, P.nord2],
-  ['--dsw-alias-button-primary-fill', P.nord10, P.nord8],
-  ['--dsw-alias-button-primary-hover', P.nord9, P.nord7],
-  ['--dsw-alias-button-tool-bar-fill-invisible', 'rgba(46, 52, 64, 0.36)', 'rgba(31, 31, 31, 0.36)'],
+  ['--dsw-alias-button-primary-fill', FROST_STRONG, P.nord8],
+  ['--dsw-alias-button-primary-hover', FROST_PRESSED, P.nord7],
+  ['--dsw-alias-button-tool-bar-fill-invisible', 'rgba(46, 52, 64, 0.36)', 'rgba(46, 52, 64, 0.36)'],
   ['--dsw-alias-button-tool-bar-fill', 'rgba(76, 86, 106, 0.5)', 'rgba(76, 86, 106, 0.5)'],
   ['--dsw-alias-button-tool-bar-hover', 'rgba(76, 86, 106, 0.6)', 'rgba(76, 86, 106, 0.6)'],
 
@@ -139,7 +152,7 @@ const TOKENS: readonly (readonly [name: string, light: string, dark: string])[] 
 
   // Labels.
   ['--dsw-alias-label-primary', P.nord0, P.nord6],
-  ['--dsw-alias-label-primary-bluish', P.nord10, P.nord4],
+  ['--dsw-alias-label-primary-bluish', FROST_STRONG, P.nord4],
   ['--dsw-alias-label-primary-dimmed', P.nord1, P.nord5],
   ['--dsw-alias-label-primary-foreground', P.nord6, P.nord0],
   ['--dsw-alias-label-primary-inverted', P.nord6, P.nord1],
@@ -147,7 +160,10 @@ const TOKENS: readonly (readonly [name: string, light: string, dark: string])[] 
   ['--dsw-alias-label-tertiary', P.nord3, P.faint],
   ['--dsw-alias-label-caption', P.nord3, P.faint],
   ['--dsw-alias-label-dimmed', P.nord3, P.faint],
-  ['--dsw-alias-link', P.nord10, P.nord8],
+  ['--dsw-alias-link', FROST_STRONG, P.nord8],
+  // Upstream's light menu icon is a literal dark grey; the dark rung already
+  // resolves through label-primary-dimmed.
+  ['--dsw-alias-menu-icon', P.nord1, P.nord5],
 
   // Markdown surfaces.
   ['--dsw-alias-markdown-citation', P.nord4, P.nord2],
@@ -166,10 +182,12 @@ const TOKENS: readonly (readonly [name: string, light: string, dark: string])[] 
   ['--dsw-alias-scrollbar-hover-l2', P.nord3, P.nord3],
 
   // States: Aurora.
-  ['--dsw-alias-state-business-primary', P.nord10, P.nord8],
+  ['--dsw-alias-state-business-primary', FROST_STRONG, P.nord8],
   ['--dsw-alias-state-business-tertiary', 'rgba(94, 129, 172, 0.16)', 'rgba(136, 192, 208, 0.16)'],
-  ['--dsw-alias-state-error-primary', P.nord11, P.nord11],
-  ['--dsw-alias-state-error-secondary', P.nord11, P.nord11],
+  // Error is the one Aurora text pair that is not reused on the always-dark
+  // toast, so it can be shaded per mode to clear 4.5:1.
+  ['--dsw-alias-state-error-primary', ERROR_TEXT_LIGHT, ERROR_TEXT_DARK],
+  ['--dsw-alias-state-error-secondary', ERROR_TEXT_LIGHT, ERROR_TEXT_DARK],
   ['--dsw-alias-state-success-primary', P.nord14, P.nord14],
   ['--dsw-alias-state-success-secondary', P.nord14, P.nord14],
   ['--dsw-alias-state-success-tertiary', 'rgba(163, 190, 140, 0.18)', 'rgba(163, 190, 140, 0.18)'],
@@ -177,6 +195,19 @@ const TOKENS: readonly (readonly [name: string, light: string, dark: string])[] 
   ['--dsw-alias-state-warn-primary', P.nord12, P.nord13],
   ['--dsw-alias-state-warn-secondary', P.nord12, P.nord13],
   ['--dsw-alias-state-warn-tertiary', 'rgba(208, 135, 112, 0.18)', 'rgba(235, 203, 139, 0.18)'],
+  // Upstream's idle dot is a bare neutral; use the mid step that clears 3:1 on
+  // each canvas (faint is too light on nord6, so light keeps the older step).
+  ['--dsw-alias-state-idle-primary', '#7B88A1', P.faint],
+
+  // File-diff surfaces are literal hex upstream, so the raw-scale patch below
+  // cannot reach them; these opaque Nord mixes take the deliverables diff off
+  // GitHub green/red and keep it one step off the canvas.
+  ['--dsw-alias-file-diff-added-bg', 'color-mix(in srgb, #A3BE8C 18%, #ECEFF4)', 'color-mix(in srgb, #A3BE8C 14%, #3B4252)'],
+  ['--dsw-alias-file-diff-added-gutter', 'color-mix(in srgb, #A3BE8C 12%, #ECEFF4)', 'color-mix(in srgb, #A3BE8C 9%, #3B4252)'],
+  ['--dsw-alias-file-diff-added-marker', 'color-mix(in srgb, #A3BE8C 55%, #2E3440)', P.nord14],
+  ['--dsw-alias-file-diff-deleted-bg', 'color-mix(in srgb, #BF616A 16%, #ECEFF4)', 'color-mix(in srgb, #BF616A 18%, #3B4252)'],
+  ['--dsw-alias-file-diff-deleted-gutter', 'color-mix(in srgb, #BF616A 10%, #ECEFF4)', 'color-mix(in srgb, #BF616A 11%, #3B4252)'],
+  ['--dsw-alias-file-diff-deleted-marker', ERROR_TEXT_LIGHT, ERROR_TEXT_DARK],
 
   // Floating surfaces.
   ['--dsw-alias-toast-bg', P.nord1, P.nord2],
@@ -217,6 +248,12 @@ const TOKENS: readonly (readonly [name: string, light: string, dark: string])[] 
   ['--dsw-static-amber-500', P.nord12, P.nord13],
   ['--dsw-static-red-400', P.nord11, P.nord11],
   ['--dsw-static-red-600', P.nord11, P.nord11],
+  // The alpha siblings feed the code-diff overlays only; without them the
+  // diff rows keep upstream green/red.
+  ['--dsw-static-green-500-a08', 'rgba(163, 190, 140, 0.08)', 'rgba(163, 190, 140, 0.08)'],
+  ['--dsw-static-green-500-a12', 'rgba(163, 190, 140, 0.12)', 'rgba(163, 190, 140, 0.12)'],
+  ['--dsw-static-red-600-a08', 'rgba(191, 97, 106, 0.08)', 'rgba(191, 97, 106, 0.08)'],
+  ['--dsw-static-red-400-a12', 'rgba(191, 97, 106, 0.12)', 'rgba(191, 97, 106, 0.12)'],
   ['--dsw-static-blue-450', P.nord9, P.nord9],
   ['--dsw-static-blue-500', P.nord10, P.nord8],
   ['--dsw-static-blue-900', P.nord10, P.nord9],

@@ -23,7 +23,7 @@
 | Host API（settings / webserver / credentials） | ✅ 兼容 | `configure({auto},fiber)`、`register({kind:'exact',path,handler})`、`credentialRef/resolve` 逐字未变；`dsh-settings` 甚至零 diff |
 | cordis 4.0.4→4.0.5 / schemastery 3.18.4→3.18.5 | ✅ 无变化 | vendor 两版仅 package.json 版本行不同，构建产物 SHA256 相同 |
 | 插件清单 / 打包 / 浏览器产物形状 | ✅ 兼容 | `dsh.bundle.patch`、`dsh.client{platform,inject}`、`__ModuleLoader__.load` banner/footer 均未变；平台种子模块表只增（`zod`、`@tanstack/react-virtual`）不减 |
-| 主题 token（`--dsw-alias/static/specific-*`） | ✅ 仍成立 | `design-platform.css` 零 diff；插件覆盖的 120 个 token 名全部仍被定义且仍被消费 |
+| 主题 token（`--dsw-alias/static/specific-*`） | ✅ 仍成立 | `design-platform.css` 零 diff；插件当前覆盖的 132 个 token 名全部仍被定义且仍被消费 |
 | 槽位 / DOM 钩子 | ✅ 仍成立 | `settings.section`、`conversation.composer.dock` 契约不变；`div[data-slot]` 锚点仍输出（两槽位未声明 `inline`）；`.dock` CSS 零 diff；`.md-table-wide` 仍在 |
 | 客户端服务名 | ✅ 未变 | `theme` / `slots` / `locale` / `configForms` 全在；`settingsScope` 仍不存在（插件的双注入适配继续正确分流） |
 | **字体层运行时** | ❌ **破坏（静默）** | 0.2.1 `base.css:29-31` 在 `body` 重新声明 `--dsw-font-family` / `--ds-font-family-code`，压过插件 `:root` 覆盖 |
