@@ -1,0 +1,6 @@
+url: https://github.com/verdana/dsh-nord
+name: verdana/dsh-nord
+category: theme
+description:
+  en: "Nord theme for the dsh Web GUI: matched light and dark palettes, its own settings page, selectable interface and code font stacks on dsh before 0.2.1, and a DeepSeek balance readout with a detail panel under the composer."
+  zh: "为 dsh Web GUI 提供 Nord 配色（浅色与深色成对）、独立的「Nord 主题」设置页、dsh 0.2.1 之前的界面与代码字体可选，以及 composer 下方的 DeepSeek 余额读数与明细面板。"
