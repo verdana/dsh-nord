@@ -20,6 +20,7 @@ src/client/BalanceBar.tsx  余额读数与其明细面板
 src/client/NordSection.tsx 设置面板里本插件自己的一页
 src/client/stores.ts       设置页与余额的 slot store
 src/client/locales.ts      dshNord 命名空间的中英文案
+src/client/version.ts      版本号（构建期 `define` 注入，设置页页脚显示）
 tests/*.test.mjs           三个纯模块的 node --test 规格；tests/balance-mock.mjs 是上游余额接口的替身
 scripts/release-lab.mjs    隔离 $DSH_HOME，逐个验证四种安装方式
 scripts/publish-npm.mjs    发布流水线：六道闸门 + tarball 核查 + 真发布
@@ -29,6 +30,8 @@ assets/                    README 截图
 ```
 
 `tsdown.config.ts` 出五个产物：`lib/index.js`（Host）、`lib/client.js`（浏览器）、以及 `lib/balance.js` / `lib/usage.js` / `lib/fonts.js` 三个纯模块——它们各自成文件，是为了 `npm test` 能在纯 Node 下直接跑，不必启动插件。
+
+浏览器产物里的版本号来自构建：`tsdown.config.ts` 读 `package.json` 的 `version`，用 `define` 把 `__DSH_NORD_VERSION__` 换成字面量，`src/client/version.ts` 再取它。浏览器半边没有 manifest 可读，所以不这么做就只能手写常量，等着和 `package.json` 漂移。
 
 浏览器那一份必须精确匹配模块系统的线格式：注册 banner/footer 包住的 CJS 体，`module`/`exports` 由 intro 引入，且只把 shell 模块表里的 specifier 留作 external（原因见「为什么没有 `dependencies` / `peerDependencies`」）。
 
@@ -82,7 +85,11 @@ profile 里装的是 `link:`，直接指回本目录，所以构建产物一落�
 
 页面的其余部分（标题层级、分组、行距、字段宽度）是内联 style——树外构建没有 CSS Modules 管线；控件则用模块表基线里的官方 `Switch` / `Input` / `Menu`，皮肤与焦点环由设计系统持有，不必自己写，也不必担心打包出第二份 React 上下文。
 
-两个坑：**`label` 必须是 thunk**（`() => t('nav')`），shell 的导航账本会重读它，所以切语言不需要重新注册；**导航图标由 shell 的 `navIcon(id)` 硬编码**，第三方 id 一律回落齿轮。
+两个坑：**`label` 必须是 thunk**（`() => t('nav')`），shell 的导航账本会重读它，所以切语言不需要重新注册；**导航图标不由槽位提供**——shell 的 `navIcon(id)` 按 id 硬编码，第三方 id 一律回落齿轮，`settings.section` 也没有图标选项。
+
+所以图标是浏览器半边的一处 DOM 补丁：按两套字典里的导航标题找到**设置面板 nav 里自己那一行**（作用域先取 `[data-shortcut-modal="settings"]`，旧宿主退回 `[role="dialog"] nav`，避免扫到侧栏里同名的会话），打一个 `data-dsh-nord-nav` 属性；样式表再把那一行的齿轮 svg 藏掉，用 `::before` + mask 画出调色板字形（`navStylesheet`）。字形的几何按宿主自己的图标来：16px 盒、约 1.3px 描边、`currentColor`，所以悬停/选中跟行一起变色。用属性而不是类名，因为 shell 的 nav 类名是 CSS Module 哈希，每次发版都会变。宿主若改了导航行结构，规则不匹配就静默退回齿轮——不会崩，但图标会「自己变回去」，是升级时该主动看的地方。
+
+页面底部还有一条 0.5px 分隔线，下面是版本号。它不手写常量：版本号来自构建期 `define`（见「项目结构」）；`src/client/version.ts` 的 `typeof` 保护让没有注入常量的构建退回 `0.0.0`，而不是在页面里抛 `ReferenceError`。
 
 ### schema 单独一个文件
 
@@ -157,10 +164,11 @@ node scripts/shots/verify-compat.mjs
 node scripts/shots/verify-settings.mjs
 ```
 
-**四处类型与探针都看不见、升级时值得主动查的东西：**
+**五处类型与探针都看不见、升级时值得主动查的东西：**
 
 - **新增的配色 token。** 上游只往 `ui-theme/src/styles/design-platform.css` 里加，而探针只抽样 9 项，抽不到新加的。做法是拿两个 tag 比这份文件（`git diff dsh-v<旧>..dsh-v<新> -- packages/client/ui-theme/src/styles/design-platform.css`）：新增的 alias 若没被这层覆盖，就会露出非 Nord 的颜色。0.2.0 加了 8 枚，其中 4 枚靠 `var()` 间接命中、4 枚需要补。
 - **图标名。** ui-primitives 改过一次名字（0.1.7 的 `IconChevronDownOutline` → 0.2.0 拆成 `…Regular` / `…Medium`），两代之间没有一个名字通用。`NordSection.tsx` 按「新→旧→本地兜底」解析，所以不会崩，但宿主重画时会静默退回兜底那份（退回时肉眼一样，是以后的隐患）。
+- **设置左栏的导航行结构。** 调色板图标挂在「`nav > button`，子节点是一个 svg（被藏掉的齿轮）加一个 label span」这个形状上，靠标题文字匹配。宿主若把图标改成槽位选项、或换了行结构，补丁会静默失效（齿轮回来），需要照着新结构改 `navStylesheet` 与 `index.ts` 里的标记逻辑。
 - **body 级的字体 token。** 0.2.1 在 `ui-theme/src/styles/base.css:29-31` 的 `body` 上重新声明 `--dsw-font-family` / `--ds-font-family-code`（值引用新的 `--dsh-font-family-*-default`）。插件写 `:root` 的覆盖会被 body 自己的声明压掉：界面与代码字体**静默**退回上游默认栈，没有任何报错，而只读 `documentElement` 的旧探针会给出假绿灯。0.2.1 起插件整体让位（`src/client/host-fonts.ts`），探针按宿主 release 分支：宿主自管时断言「不注入字体层、body 不是插件栈、设置页只剩说明」，旧版才断言插件字体生效。
 - **那条宽表格补丁。** 它绑在上游「静止藏条、悬停显条」的做法上；上游若改了 `md-table-wide` 钩子或取消悬停切换，就要重新评估这条规则是删还是改写。
 

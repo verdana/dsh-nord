@@ -31,6 +31,7 @@ import { CUSTOM_FONT, FONT_PRESETS, fontStacks, INHERIT_FONT, isPreset, presetPr
 import type { NordKey } from './locales.ts'
 import { SETTINGS_ATTR } from './nord.ts'
 import type { createNordSettingsStore } from './stores.ts'
+import { PLUGIN_VERSION } from './version.ts'
 
 /** Geometry of the caret drawn when the host ships neither icon name below. */
 const CARET_SIZE = 14
@@ -162,6 +163,22 @@ const FONT_CARET_STYLE = { flex: 'none', color: 'var(--dsw-alias-label-tertiary)
 
 const NOTE_STYLE = { margin: '12px 0 0', fontSize: '12px', lineHeight: '18px', color: 'var(--dsw-alias-label-tertiary)' } as const
 const ERROR_STYLE = { ...NOTE_STYLE, color: 'var(--dsw-alias-state-error-primary)' } as const
+
+/**
+ * Page footer: a hairline in the same weight the rows use, then the release
+ * label. The separator belongs to the footer rather than to a trailing `<hr>`
+ * so the line and the text it introduces cannot drift apart, and the spacing
+ * matches the group rhythm above it.
+ */
+const FOOTER_STYLE = {
+  marginTop: '24px',
+  paddingTop: '12px',
+  borderTop: '0.5px solid var(--dsw-alias-border-l3)',
+  fontSize: '12px',
+  lineHeight: '18px',
+  color: 'var(--dsw-alias-label-tertiary)',
+  fontVariantNumeric: 'tabular-nums',
+} as const
 
 /**
  * The menu row a stored choice lands on: a preset id, one of the two keywords,
@@ -478,6 +495,7 @@ export function NordSection({ useStore, t, save }: NordSectionProps) {
       </div>
       {disabled ? <p style={NOTE_STYLE}>{t('page.readonly')}</p> : null}
       {error === '' ? null : <p style={ERROR_STYLE}>{t('page.saveFailed')}</p>}
+      <footer style={FOOTER_STYLE}>{t('page.version', { version: PLUGIN_VERSION })}</footer>
     </section>
   )
 }

@@ -17,7 +17,7 @@ import { fontStacks } from '../fonts.ts'
 import { BalanceBar } from './BalanceBar.tsx'
 import { detectHostFonts } from './host-fonts.ts'
 import { en, LOCALE_NS, zh } from './locales.ts'
-import { FONT_STYLE_ID, fontStylesheet, nordTokens, SECTION_ID, SECTION_ORDER, SURFACE_STYLE_ID, surfaceStylesheet, TABLE_STYLE_ID, tableStylesheet, TOKEN_SOURCE } from './nord.ts'
+import { FONT_STYLE_ID, fontStylesheet, NAV_ATTR, NAV_STYLE_ID, navStylesheet, nordTokens, SECTION_ID, SECTION_ORDER, SURFACE_STYLE_ID, surfaceStylesheet, TABLE_STYLE_ID, tableStylesheet, TOKEN_SOURCE } from './nord.ts'
 import { NordSection } from './NordSection.tsx'
 import { mountSettings } from './settings.ts'
 import { createNordBalanceStore, createNordSettingsStore } from './stores.ts'
@@ -110,6 +110,50 @@ export function apply(ctx: ClientContext): void {
       document.head.append(element)
       return () => { element.remove() }
     }, 'dsh-nord: wide-table scroll patch')
+
+    // The settings rail glyph. The shell maps section ids to icons itself and
+    // gives every third-party id the generic gear; the slot contract carries no
+    // icon, so the one nav row this plugin owns is marked in the DOM. See
+    // `navStylesheet` for the drawing and why the mark is an attribute.
+    ctx.effect(() => {
+      const element = document.createElement('style')
+      element.id = NAV_STYLE_ID
+      element.textContent = navStylesheet()
+      document.head.append(element)
+      return () => { element.remove() }
+    }, 'dsh-nord: nav glyph')
+
+    ctx.effect(() => {
+      // Both dictionaries: the row is marked once, and a language switch only
+      // rewrites its label text — so whichever locale the panel was opened in
+      // has to be recognised.
+      const labels = new Set([zh.nav, en.nav])
+      /** The buttons of the settings rail; scoped to the panel, never the sidebar. */
+      const railButtons = (): HTMLButtonElement[] => {
+        const panel = document.querySelector('[data-shortcut-modal="settings"]')
+        if (panel !== null) return [...panel.querySelectorAll<HTMLButtonElement>('nav button')]
+        // Older shells may not carry the marker; their panel is still the only
+        // dialog with a nav, and the label match keeps this from touching others.
+        return [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] nav button')]
+      }
+      const mark = (): void => {
+        for (const button of railButtons()) {
+          if (button.hasAttribute(NAV_ATTR)) continue
+          if (!labels.has(button.textContent?.trim() ?? '')) continue
+          button.setAttribute(NAV_ATTR, '')
+        }
+      }
+      // The settings panel is portaled straight to <body>, so opening and
+      // closing it is a body-level child change. A subtree observer would fire
+      // on every streaming token in the conversation behind the panel; this one
+      // stays quiet until the panel itself comes or goes. The row is marked
+      // before it can paint, and React reuses the button across re-renders, so
+      // a marked row keeps its glyph without per-frame work.
+      const observer = new MutationObserver(mark)
+      observer.observe(document.body, { childList: true })
+      mark()
+      return () => { observer.disconnect() }
+    }, 'dsh-nord: nav glyph mark')
 
     // The colour layer, folded over whichever base palette is active.
     ctx.effect(() => {

@@ -15,10 +15,18 @@
  * CJS body wrapped by the registration banner/footer, with `module`/`exports`
  * introduced by the intro because the factory only receives `require`.
  */
+import { readFileSync } from 'node:fs'
 import type { UserConfig } from 'tsdown'
 
 /** Package name the browser module system expects as the registration id. */
 const PACKAGE_NAME = 'dsh-nord'
+
+/**
+ * Release label the browser half shows in its settings footer. Read here
+ * because a browser bundle has no manifest at runtime; `src/client/version.ts`
+ * resolves `__DSH_NORD_VERSION__` to this string.
+ */
+const PACKAGE_VERSION = (JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version: string }).version
 
 /**
  * Modules the Web shell seeds into its browser module table
@@ -71,6 +79,9 @@ const config: UserConfig[] = [
     dts: false,
     sourcemap: true,
     clean: false,
+    // `PLUGIN_VERSION` in `src/client/version.ts` becomes a literal, so the
+    // served bundle needs no manifest lookup and no runtime request.
+    define: { __DSH_NORD_VERSION__: JSON.stringify(PACKAGE_VERSION) },
     deps: {
       neverBundle: isPlatformModule,
       alwaysBundle: (specifier: string) => !isPlatformModule(specifier),

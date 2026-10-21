@@ -143,6 +143,44 @@ try {
   ok('独立页面', `标题「${page1.heading}」，分组 ${page1.groups.join(' / ')}`)
   ok('整页落在内容列内', `高 ${Math.round(page1.rootHeight)}px / 列 ${page1.columnHeight}px，宽 ${Math.round(page1.rootWidth)}px，无滚动`)
 
+  // ── 左栏图标：shell 只认自己的分区 id，第三方行回落齿轮，插件自己画 ──────────
+  const railRow = await page.evaluate(() => {
+    const row = [...document.querySelectorAll('[role="dialog"] nav button')]
+      .find((el) => el.innerText.trim() === 'Nord 主题')
+    if (row === undefined) return null
+    const glyph = getComputedStyle(row, '::before')
+    const shellIcon = row.querySelector(':scope > svg')
+    return {
+      marked: row.hasAttribute('data-dsh-nord-nav'),
+      gearHidden: shellIcon !== null && getComputedStyle(shellIcon).display === 'none',
+      glyph: glyph.maskImage || glyph.webkitMaskImage || '',
+      glyphSize: `${glyph.width}×${glyph.height}`,
+      color: glyph.backgroundColor,
+    }
+  })
+  if (railRow === null) throw new Error('左栏找不到「Nord 主题」那一行')
+  if (!railRow.marked) throw new Error('本插件那一行没有导航标记，图标补丁没生效')
+  if (!railRow.gearHidden) throw new Error('本插件那一行的默认齿轮图标没有被隐藏')
+  if (!railRow.glyph.startsWith('url("data:image/svg+xml')) {
+    throw new Error(`导航图标没有画成自己的字形：${railRow.glyph.slice(0, 80)}`)
+  }
+  if (railRow.glyphSize !== '16px×16px') throw new Error(`导航图标尺寸不是 16px：${railRow.glyphSize}`)
+  ok('左栏图标', `自有字形 ${railRow.glyphSize}，齿轮已隐藏，颜色 ${railRow.color}`)
+
+  // ── 页脚：一条分隔线 + 当前版本号（版本读自 package.json，与构建期 define 同源）──
+  const VERSION = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version
+  const footer = await page.evaluate(() => {
+    const root = document.querySelector('[data-dsh-nord-settings]')
+    const el = root?.querySelector('footer')
+    if (el === undefined || el === null) return null
+    const style = getComputedStyle(el)
+    return { text: el.innerText.trim(), borderWidth: style.borderTopWidth, borderStyle: style.borderTopStyle }
+  })
+  if (footer === null) throw new Error('设置页底部没有页脚')
+  if (footer.text !== `版本 ${VERSION}`) throw new Error(`页脚版本不对：${JSON.stringify(footer.text)} ≠ 「版本 ${VERSION}」`)
+  if (parseFloat(footer.borderWidth) <= 0) throw new Error(`页脚没有分隔线：${footer.borderWidth} ${footer.borderStyle}`)
+  ok('页脚版本', `${footer.text}，分隔线 ${footer.borderWidth} ${footer.borderStyle}`)
+
   // ── 字体面：0.2.1 起宿主自管字体，插件让位；更早的版本仍由插件提供 ──────────
   if (hostFonts) {
     // 委托断言：字体选择器不出现、说明文字在、字体样式表不注入、body 不是插件栈。

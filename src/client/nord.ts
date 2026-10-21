@@ -64,6 +64,9 @@ export const SURFACE_STYLE_ID = 'dsh-nord-surfaces'
 /** `<style>` element id carrying the wide-table scroll patch. */
 export const TABLE_STYLE_ID = 'dsh-nord-tables'
 
+/** `<style>` element id carrying the settings-nav glyph patch. */
+export const NAV_STYLE_ID = 'dsh-nord-nav'
+
 /** Attribute marking the balance readout: dock-row member and pill skin. */
 export const BAR_ATTR = 'data-dsh-nord-bar'
 
@@ -75,6 +78,9 @@ export const USAGE_ATTR = 'data-dsh-nord-usage'
 
 /** Attribute marking this plugin's own settings page. */
 export const SETTINGS_ATTR = 'data-dsh-nord-settings'
+
+/** Attribute marking this plugin's own row in the settings navigation. */
+export const NAV_ATTR = 'data-dsh-nord-nav'
 
 /** Section id this plugin registers into the settings nav (and `only` key). */
 export const SECTION_ID = 'dsh-nord'
@@ -315,6 +321,54 @@ export function fontStylesheet(stacks: FontStacks): string {
  */
 export function tableStylesheet(): string {
   return '.md-table-wide{overflow-x:auto!important;padding-bottom:0!important;}'
+}
+
+/**
+ * The glyph this plugin's settings nav row draws in place of the shell's gear.
+ *
+ * A palette, because the row is a theme: among the shipped rail glyphs (account,
+ * models, plugins, presets, archive, and the gear those fall back to) the palette
+ * is the one mark that reads as 「appearance」 rather than 「more settings」. It is
+ * drawn in the host's own geometry — a 16px box at a 1.3px effective stroke (the
+ * artwork is a 24-unit outline scaled to the slot, so `stroke-width: 2` lands on
+ * 1.33px) and `currentColor` throughout, so it dims and highlights with the row's
+ * own label instead of carrying a fixed brand colour.
+ *
+ * The paint wells are filled `r=1` rather than the reference art's hairline
+ * dots: below a pixel they antialias into grey dust at this size.
+ */
+const NAV_GLYPH = `url("data:image/svg+xml,${encodeURIComponent([
+  "<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>",
+  "<path d='M12 2C6.489 2 2 6.489 2 12s4.489 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z'/>",
+  "<circle cx='13.5' cy='6.5' r='1' fill='black' stroke='none'/>",
+  "<circle cx='17.5' cy='10.5' r='1' fill='black' stroke='none'/>",
+  "<circle cx='8.5' cy='7.5' r='1' fill='black' stroke='none'/>",
+  "<circle cx='6.5' cy='12.25' r='1' fill='black' stroke='none'/>",
+  '</svg>',
+].join(''))}")`
+
+/**
+ * The settings-nav glyph patch. dsh's settings shell draws its rail icons from
+ * a hardcoded per-id map (`navIcon(id)` in ui-settings-general) and hands every
+ * third-party section the generic settings gear; the `settings.section` slot
+ * carries no icon option, so the row is marked from the browser half and
+ * skinned here.
+ *
+ * The mark is an attribute, never a class: the shell's nav classes are hashed
+ * per release. Only the button's direct-child `svg` is hidden — its other child
+ * is the label — and the replacement is a `::before` box painted with the glyph
+ * as a mask, so it inherits `currentColor` through the row's hover and active
+ * states. A host that renders a different nav row shape simply keeps its gear:
+ * no rule here matches and nothing breaks.
+ * @returns stylesheet text for one `<style>` element.
+ */
+export function navStylesheet(): string {
+  return [
+    `button[${NAV_ATTR}]>svg{display:none;}`,
+    `button[${NAV_ATTR}]::before{content:'';flex:none;width:16px;height:16px;background-color:currentColor;`
+    + `-webkit-mask-image:${NAV_GLYPH};-webkit-mask-repeat:no-repeat;-webkit-mask-position:center;-webkit-mask-size:16px 16px;`
+    + `mask-image:${NAV_GLYPH};mask-repeat:no-repeat;mask-position:center;mask-size:16px 16px;}`,
+  ].join('')
 }
 
 /**

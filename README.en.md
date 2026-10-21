@@ -16,7 +16,7 @@ A Nord repaint for the [dsh](https://github.com/deepseek-ai/deepseek-harness) We
 
   ![Balance detail](assets/03-balance.png)
 
-- **A settings page of its own** —— The settings panel's left nav gains a *Nord theme* entry after the official sections; the plugin no longer squeezes rows into *General*. The page is grouped into appearance, fonts, and the balance bar; from dsh 0.2.1 on, the font group becomes one line stating the delegation (fonts are managed by dsh's own settings).
+- **A settings page of its own** —— The settings panel's left nav gains a *Nord theme* entry after the official sections; the plugin no longer squeezes rows into *General*. The entry draws its own palette glyph, and the page ends with a divider and the current version number. The page is grouped into appearance, fonts, and the balance bar; from dsh 0.2.1 on, the font group becomes one line stating the delegation (fonts are managed by dsh's own settings).
 
   ![Settings](assets/02-settings.png)
 
