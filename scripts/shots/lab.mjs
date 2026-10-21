@@ -12,10 +12,12 @@ import { spawn } from 'node:child_process'
 import { copyFileSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import { homedir } from 'node:os'
-import { basename, join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { chromium } from 'playwright-core'
 
-export const ROOT = 'D:\\deepseek-harness\\dsh-nord'
+/** 仓库根：从本文件的位置推出来，检出目录搬家后不必再改这里。 */
+export const ROOT = dirname(dirname(dirname(fileURLToPath(import.meta.url))))
 export const LAB = join(ROOT, '.shot-lab')
 export const HOME = join(LAB, 'home')
 export const OUT = join(LAB, 'out')
