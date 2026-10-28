@@ -18,14 +18,14 @@
 |---|---|---|
 | `package.json` 声明 `dsh.bundle` | ✅ | `dsh.bundle.patch: ./cordis.patch.yml` |
 | 仓库根有 `cordis.patch.yml` | ✅ | 内容为 `insert: [{ id: dsh-nord, name: dsh-nord }]` |
-| 仓库有真实可用代码 | ✅ | `src/`（11 个源文件）、`lib/` 预构建产物、`tests/`、33 次提交 |
+| 仓库有真实可用代码 | ✅ | `src/`（15 个源文件）、`lib/` 预构建产物、`tests/`、持续提交 |
 | 仓库创建满 1 天 | ✅ | GitHub API：`created_at` = 2026-09-20 |
-| 项目处于活跃维护 | ✅ | 最新 release 0.4.0（2026-10-18），npm 同步发布 |
+| 项目处于活跃维护 | ✅ | 2026-09-20 起持续发版；当前版本见 npm badge，逐版历史见 `CHANGELOG.md` |
 | 已加 `dsh-plugin` topic | ❌ **待办** | GitHub API 返回 `topics: []` |
 | 描述属实、无营销词 | ✅ | 已逐句对照代码，见 `pr-body.md` 的 “claim by claim” |
 | 分类贴合 | ✅ | `theme`（主题 Tab 会自动收录这一条） |
 | 截图声明（推荐） | ✅ 本次新增 | `screenshots.json` → `assets/01-theme.png`、`02-settings.png`、`03-balance.png` |
-| npm 包 `repository` 指回仓库 | ✅ | `dsh-nord@0.4.0`，`repository.url = git+https://github.com/verdana/dsh-nord.git` |
+| npm 包 `repository` 指回仓库 | ✅ | npm 上的 `dsh-nord`，`repository.url = git+https://github.com/verdana/dsh-nord.git` |
 
 **结论：唯一的硬性缺口是 topic。** 其余都已满足；条目文件与截图声明已经准备好。
 
@@ -139,4 +139,4 @@ push 完终端会打印一个 “Create a pull request” 链接，点进去填�
 }
 ```
 
-这属于「更好的安装体验」，与收录无关，而且会牵动一次发版（0.4.1），所以我没动；要做可以单独一轮。
+这属于「更好的安装体验」，与收录无关，而且会牵动一次发版，所以我没动；要做可以单独一轮。

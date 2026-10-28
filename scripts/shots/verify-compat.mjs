@@ -58,14 +58,36 @@ function findSessionFixture() {
     }
     return undefined
   }
+  /**
+   * 这条会话用过模型没有。
+   *
+   * 「用量信息」那一行只在 `modelSelection.next` 有 provider 时渲染，而 `next` 是
+   * `pending ?? lastUsed`：**新建的空白会话两者都是 null**，选它当夹具就等于让这道
+   * 断言必然失败（与 dsh 版本无关，rc.2 与 rc.4 表现一致）。所以优先挑
+   * 「投影缓存里记着 lastUsed」的会话。
+   * @param projection - 该会话的投影缓存文件。
+   * @returns 缓存里有没有一次真实请求留下的模型选择。
+   */
+  const hasUsedModel = (projection) => {
+    try {
+      return JSON.parse(readFileSync(projection, 'utf8'))?.record?.rows?.modelSelection?.val?.lastUsed != null
+    } catch {
+      return false
+    }
+  }
   const preferred = pick(PREFERRED_SESSION_ID)
-  if (preferred !== undefined) return { ...preferred, title: PREFERRED_TITLE }
+  if (preferred !== undefined && hasUsedModel(preferred.projection)) return { ...preferred, title: PREFERRED_TITLE }
+  const titled = []
   for (const id of readdirSync(root)) {
     const found = pick(id)
     if (found === undefined) continue
     const title = JSON.parse(readFileSync(found.projection, 'utf8'))?.record?.rows?.title?.val
-    if (typeof title === 'string' && title.trim() !== '') return { ...found, title }
+    if (typeof title === 'string' && title.trim() !== '') titled.push({ ...found, title })
   }
+  const used = titled.find((candidate) => hasUsedModel(candidate.projection))
+  if (used !== undefined) return used
+  if (preferred !== undefined) return { ...preferred, title: PREFERRED_TITLE }
+  if (titled.length > 0) return titled[0]
   throw new Error(`找不到可用的会话夹具：${root} 下没有同时具备会话文件与投影缓存的会话`)
 }
 
@@ -83,9 +105,10 @@ const EXPECTED = '42.50'
 const TOKENS = [
   ['--dsw-alias-bg-base', '#ECEFF4', '#2E3440'],
   ['--dsw-alias-label-primary', '#2E3440', '#ECEFF4'],
-  ['--dsw-alias-label-tertiary', '#4C566A', '#7B88A1'],
+  ['--dsw-alias-label-tertiary', '#4C566A', '#8E9AAD'],
   ['--dsw-alias-brand-primary', '#5E81AC', '#88C0D0'],
-  ['--dsw-alias-state-error-primary', '#BF616A', '#BF616A'],
+  // error 文本是 color-mix：自定义属性在计算样式里保留声明原文，所以这里比的是同一条式子
+  ['--dsw-alias-state-error-primary', 'color-mix(in srgb, #bf616a 75%, #2e3440)', 'color-mix(in srgb, #bf616a 65%, #eceff4)'],
   ['--dsw-static-neutral-00', '#ECEFF4', '#2E3440'],
   ['--dsw-static-deepseek-500', '#5E81AC', '#88C0D0'],
   ['--dsw-specific-sidebar-fill', '#E5E9F0', '#3B4252'],

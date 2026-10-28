@@ -1,8 +1,12 @@
 # dsh-nord
 
+[![npm 最新版本](https://img.shields.io/npm/v/dsh-nord.svg)](https://www.npmjs.com/package/dsh-nord)
+
 **中文** | [English](https://github.com/verdana/dsh-nord/blob/main/README.en.md)
 
 给 [dsh](https://github.com/deepseek-ai/deepseek-harness) Web GUI 换一套 Nord：Nord 配色、一页自己的设置，以及 composer 下方的 DeepSeek 余额读数。dsh **0.2.1** 起字体与字号由 dsh 自己管理，0.1.7 / 0.2.0 上本插件仍提供字体替换。本插件只支持 **0.1.7 / 0.2.0 / 0.2.1** 三代，`≤ 0.1.5` 自 0.4.0 起不再支持。
+
+> 版本与逐版变更见 [CHANGELOG.md](./CHANGELOG.md)；npm 上的最新版本见上方 badge。
 
 ![Nord 主题（深色）](assets/01-theme.png)
 
@@ -26,14 +30,14 @@
 
 ## 环境要求
 
-- 支持的 dsh：**`0.2.1-rc.2`**（构建基线，实机实测）、**`0.2.0-rc.2`**、**`0.1.7-rc.2`**，各自实测过；**`≤ 0.1.5` 自 0.4.0 起不再支持**，详见[兼容性](#兼容性)。
+- 支持的 dsh：**`0.2.1-rc.4`**（构建基线，实机实测）、**`0.2.0-rc.2`**、**`0.1.7-rc.2`**，各自实测过；**`≤ 0.1.5` 自 0.4.0 起不再支持**，详见[兼容性](#兼容性)。
 - 余额读数需要 `DEEPSEEK_API_KEY`（由 dsh 的 credentials 服务解析）。没有凭据时余额条显示错误文案，主题、字体、设置不受影响。
 
 ### 兼容性
 
 | dsh | 状态 | 字体 |
 |---|---|---|
-| `0.2.1` | 构建基线，实测 | 字体与字号由 dsh 自己的设置管理；插件不注入任何字体 |
+| `0.2.1` | 构建基线（`rc.4` 实测） | 字体与字号由 dsh 自己的设置管理；插件不注入任何字体 |
 | `0.2.0` | 实测 | 插件提供字体替换（界面 / 代码字体可选） |
 | `0.1.7` | 实测 | 同上 |
 | `≤ 0.1.5` | **0.4.0 起不再支持**（含 `0.1.5-rc.1` / `rc.2` / `rc.3` 及更早全部版本） | — |
@@ -47,11 +51,11 @@
 从 npm：
 
 ```sh
-dsh plugin --profile web add dsh-nord@^0.4.0
+dsh plugin --profile web add dsh-nord
 dsh web
 ```
 
-版本写成 `^0.4.0` 这样的范围，而不是让 pnpm 去解 `latest` 标签。原因是 pnpm 11 起默认有 24 小时的「新版本冷静期」：某个版本发布不满一天时，`@latest` 解析不到它，会静默装回上一个版本（刚发版后想立刻验证时很容易踩到）。要装某个确切版本就直接写全，例如 `dsh-nord@0.4.0`。
+不写版本号时 pnpm 解 `latest` 标签。注意 pnpm 11 起默认有 24 小时的「新版本冷静期」：某个版本发布不满一天时，`@latest` 解析不到它，会静默装回上一个版本（刚发版后想立刻验证时很容易踩到）。要装某个确切版本就直接写全，版本号看上方 badge 或 [CHANGELOG.md](./CHANGELOG.md)，例如 `dsh-nord@<版本>`。
 
 从本仓库源码：
 
@@ -80,7 +84,7 @@ git 安装需要你在 profile 的 `pnpm-workspace.yaml` 里为该包授权构�
 
 ```sh
 dsh plugin --profile web remove dsh-nord
-dsh plugin --profile web add dsh-nord@^0.4.0
+dsh plugin --profile web add dsh-nord
 ```
 
 如果 dsh 还停在 `≤ 0.1.5`，别升到 0.4.x：先把 dsh 升到 0.1.7 或更新的支持版本，否则就留在插件 0.3.x（0.1.5 不会读 `engines.dsh`，拦不住这次安装）。

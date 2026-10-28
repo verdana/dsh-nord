@@ -6,3 +6,4 @@ pnpm-workspace.yaml
 .release-lab/
 .shot-lab/
 .dsh-ops-*
+.workbuddy/

@@ -9,6 +9,9 @@
  *   2. 元数据核查   —— name/version/license/files/dsh 段齐不齐，LICENSE 版权人是否还是占位符，
  *                     repository 字段在不在（npm 页面靠它把 README 的相对图片路径指到仓库）
  *   3. build/typecheck/test —— 按 package.json 里的 script 跑，任一失败即停
+ *   3.5 CHANGELOG 闸门 —— 升版后的版本号必须在 CHANGELOG.md 里有条目：文档里不再声明
+ *                    「当前发布是 X」，所以版本历史是唯一必须人工写的发布材料，写漏了
+ *                    等于这一版没有记录
  *   4. tarball 核查 —— npm pack --dry-run --json 拿到真实文件清单，核对必须有的与绝不能有的
  *   5. registry 核查 —— 这个版本是否已存在、包名归谁、当前登录身份是否为维护者
  *   6. 发布         —— 默认不真发（dry-run），要真发必须显式 --publish
@@ -49,6 +52,7 @@ import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { parsePackReport } from './pack-report.mjs'
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const PUBLIC_REGISTRY = 'https://registry.npmjs.org/'
@@ -57,7 +61,17 @@ const TEMP_NPMRC = join(ROOT, '.npmrc')
 
 // ── 这些是发布闸门的一部分，改这里等于改发布纪律 ────────────────────────────
 /** tarball 里必须出现的文件（相对包根）。`lib/*` 用前缀匹配。 */
-const REQUIRED_FILES = ['package.json', 'README.md', 'LICENSE', 'cordis.patch.yml', 'lib/index.js', 'lib/client.js']
+const REQUIRED_FILES = [
+  'package.json',
+  'README.md',
+  // 版本历史住在这里：文档不再声明「当前发布是 X」，README 又是相对链接指向它，
+  // 所以它必须进包
+  'CHANGELOG.md',
+  'LICENSE',
+  'cordis.patch.yml',
+  'lib/index.js',
+  'lib/client.js',
+]
 /** tarball 里绝不能出现的路径前缀/文件名。 */
 const FORBIDDEN_FILES = ['src/', 'tests/', 'scripts/', 'assets/', 'tsdown.config.ts', 'tsconfig.json', '.release-lab/']
 /** LICENSE 里等于没写版权人的占位符。 */
@@ -153,6 +167,11 @@ function printHelp() {
   --keep-tarball           保留打出来的 tarball
   --propagation-timeout <秒>
                            发布后等 registry 列出该版本的上限（默认 180；0 = 查一次就走）
+
+发布前必须人工写的:
+  CHANGELOG.md             把「未发布」改成 \`## [x.y.z] - YYYY-MM-DD\`，版本号要与
+                           --bump 得出的结果一致，并作为独立提交先提交好
+                           （工作树闸门要求干净，发布提交只带 package.json / LICENSE）
 
 发布前修正:
   --bump <patch|minor|major|prepatch|x.y.z>
@@ -366,6 +385,28 @@ async function bumpVersion() {
   info('注意：这一步之后工作树就是脏的，脚本会跳过「工作树干净」的复查')
 }
 
+// ── 3.5 CHANGELOG 闸门 ──────────────────────────────────────────────────────
+/**
+ * 文档里不再写「当前发布是 X」之后，CHANGELOG 就成了唯一必须人工写的发布材料，
+ * 于是它也得被核查：版本号归脚本管（`--bump`），「这一版改了什么」归人管，两者对不上
+ * 等于这一版没有记录。工作树闸门要求发布前干净，所以这一节只能在发布前提交好——
+ * 这也正是它必须能自动核对的原因。
+ */
+function checkChangelog() {
+  step('CHANGELOG 闸门')
+
+  const path = join(ROOT, 'CHANGELOG.md')
+  if (!existsSync(path)) fail('CHANGELOG.md 不存在 —— 版本历史是发布材料的一部分')
+
+  const headings = [...readFileSync(path, 'utf8').matchAll(/^##\s+\[?v?(\d+\.\d+\.\d+)\]?/gm)].map((match) => match[1])
+  if (!headings.includes(PKG_VERSION)) {
+    fail(`CHANGELOG.md 里没有 ${PKG_VERSION} 这一节：\n` +
+      `       发布前把「未发布」改成 \`## [${PKG_VERSION}] - <日期>\` 并提交，\n` +
+      `       否则发出去的版本在变更记录里不存在（已有：${headings.join(', ') || '无'}）`)
+  }
+  ok(`CHANGELOG.md 里有 ${PKG_VERSION} 的条目`)
+}
+
 // ── 4. build / typecheck / test ─────────────────────────────────────────────
 
 async function runChecks() {
@@ -408,11 +449,14 @@ async function checkTarball() {
   const packed = await run('npm', args)
   if (packed.code !== 0) fail(`npm pack 失败:\n${packed.stderr.trim().split('\n').slice(-8).join('\n')}`)
 
-  // stdout 里混着构建日志，从第一个 { 开始才是 JSON
-  const at = packed.stdout.indexOf('{')
-  if (at === -1) fail(`npm pack --json 没吐出 JSON:\n${packed.stdout.slice(0, 400)}`)
-  const report = JSON.parse(packed.stdout.slice(at))[PKG_NAME]
-  if (report === undefined) fail('npm pack --json 的报告里没有这个包')
+  // stdout 里混着构建日志；另外 npm 10 与 11 的 JSON 形状不同（对象 / 数组），
+  // 交给 pack-report 统一处理
+  let report
+  try {
+    report = parsePackReport(packed.stdout, PKG_NAME)
+  } catch (error) {
+    fail(error.message)
+  }
 
   const paths = report.files.map((file) => file.path)
   for (const required of REQUIRED_FILES) {
@@ -713,6 +757,7 @@ async function main() {
   checkMetadata()
   await bumpVersion()
   if (opts.bump && dirtyBefore === '') info('（升版造成的改动已交给结尾的 git commit 处理）')
+  checkChangelog()
   await runChecks()
   await checkTarball()
   const user = await checkRegistry()

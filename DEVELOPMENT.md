@@ -15,15 +15,16 @@ src/usage.ts               「用量信息」链接的判定
 src/fonts.ts               字体预设目录 + 「存储选项 → CSS 家族列表」的解析与清洗
 src/client/index.ts        浏览器半边：主题层、字体、三枚样式表、设置页、余额轮询、两个 slot 注册
 src/client/settings.ts     设置传输：把浏览器 configForms 归一成设置页消费的接口
-src/client/nord.ts         Nord 调色板（120 token）、字体 :root 规则、余额表面与宽表格补丁
+src/client/nord.ts         Nord 调色板（132 token）、字体 :root 规则、余额表面与宽表格补丁
 src/client/BalanceBar.tsx  余额读数与其明细面板
 src/client/NordSection.tsx 设置面板里本插件自己的一页
 src/client/stores.ts       设置页与余额的 slot store
 src/client/locales.ts      dshNord 命名空间的中英文案
 src/client/version.ts      版本号（构建期 `define` 注入，设置页页脚显示）
-tests/*.test.mjs           三个纯模块的 node --test 规格；tests/balance-mock.mjs 是上游余额接口的替身
+tests/*.test.mjs           四个纯模块 + `npm pack` 报告解析的 node --test 规格；tests/balance-mock.mjs 是上游余额接口的替身
 scripts/release-lab.mjs    隔离 $DSH_HOME，逐个验证四种安装方式
-scripts/publish-npm.mjs    发布流水线：六道闸门 + tarball 核查 + 真发布
+scripts/publish-npm.mjs    发布流水线：七道闸门（含 CHANGELOG）+ tarball 核查 + 真发布
+scripts/pack-report.mjs    `npm pack --json` 的解析（npm 10 / 11 两种形状）
 scripts/dsh-version-lab.mjs 并排装另一个 dsh 版本（装在仓库外）
 scripts/shots/*.mjs        隔离实例 + headless Edge：两个上游接口探针、截图
 assets/                    README 截图
@@ -138,15 +139,15 @@ div[data-slot="conversation.composer.dock"]:has(> [data-dsh-nord-bar]) {
 
 ## 版本现实
 
-本插件的**构建基线是 `0.2.1-rc.2`**，并**同时支持 `0.1.7-rc.2` 与 `0.2.0-rc.2`**；每一代都用两个探针实跑过（0.2.1 的 `verify-compat` 会话段还差 v4 workspace 夹具，模块加载器 / 样式表 / 字体委托 / token 抽样已通过；见「本地验证」）。**`≤ 0.1.5`（含 `0.1.5-rc.1` / `rc.2` / `rc.3` 及更早）不再支持**——那一代没有 `configForms`，命名空间要靠 `installSection` + `settingsScope` 另一套接口，代码为此维护了两份 schema 与双份设置传输；而 dsh 发布频繁，没有必要为远古版本养一条并行分支。（`schemastery` 不用 dsh 的版本号，单独钉在 `3.18.5`，因为 `.volatile()` 是它才有的方法。）
+本插件的**构建基线是 `0.2.1-rc.4`**，并**同时支持 `0.1.7-rc.2` 与 `0.2.0-rc.2`**；每一代都用两个探针实跑过（rc.4 上设置页探针全过、接口探针 8/9，「用量信息」座位仍在等一条有真实请求的夹具；0.1.7 / 0.2.0 上是完整的两套。见「本地验证」）。**`≤ 0.1.5`（含 `0.1.5-rc.1` / `rc.2` / `rc.3` 及更早）不再支持**——那一代没有 `configForms`，命名空间要靠 `installSection` + `settingsScope` 另一套接口，代码为此维护了两份 schema 与双份设置传输；而 dsh 发布频繁，没有必要为远古版本养一条并行分支。（`schemastery` 不用 dsh 的版本号，单独钉在 `3.18.5`，因为 `.volatile()` 是它才有的方法。）
 
-**支持下限同时写进 `package.json` 的 `engines.dsh: ">=0.1.7-0"`**：dsh 0.2.1 起安装/启动会按它判定兼容性（`engines.dsh` 存在时独占判定、忽略 `peerDependencies`；预发布版本参与区间比较，所以下限写成 `-0` 才能收下 `0.1.7-rc.2`），不满足时拒绝并提示 `dsh plugin allow-version` 豁免；0.1.7 / 0.2.0 的装载器不读这个字段，所以那两个版本照常可用（0.1.5 也不读，因此它拦不住 0.4.x 的安装——那里只能靠文档劝退，请用 0.3.x）。改这个区间前先拿 `packages/boot/app-boot/src/plugin-compatibility.ts` 的 `evaluatePluginCompatibility()` 对四个版本（`0.1.5-rc.3` 应被拒，`0.1.7-rc.2` / `0.2.0-rc.2` / `0.2.1-rc.2` 应通过）各跑一遍。
+**支持下限同时写进 `package.json` 的 `engines.dsh: ">=0.1.7-0"`**：dsh 0.2.1 起安装/启动会按它判定兼容性（`engines.dsh` 存在时独占判定、忽略 `peerDependencies`；预发布版本参与区间比较，所以下限写成 `-0` 才能收下 `0.1.7-rc.2`），不满足时拒绝并提示 `dsh plugin allow-version` 豁免；0.1.7 / 0.2.0 的装载器不读这个字段，所以那两个版本照常可用（0.1.5 也不读，因此它拦不住 0.4.x 的安装——那里只能靠文档劝退，请用 0.3.x）。改这个区间前先拿 `packages/boot/app-boot/src/plugin-compatibility.ts` 的 `evaluatePluginCompatibility()` 对四个版本（`0.1.5-rc.3` 应被拒，`0.1.7-rc.2` / `0.2.0-rc.2` / `0.2.1-rc.4` 应通过）各跑一遍。
 
 | dsh | 设置命名空间 | 备注 |
 |---|---|---|
 | `0.1.7-rc.2` | Loader 从条目导出的 `Config` 自动派生，写 profile 的 `cordis.patch.yml`；浏览器 `ctx.configForms.get()` | 支持的最老一代 |
 | `0.2.0-rc.2` | 同上 | 配色表新增 8 枚 alias token |
-| `0.2.1-rc.2` | 同上 | 字体设置归 dsh 自己：字体 token 从 `:root` 挪到 `body`，General 新增字体与三档字号行。插件按页面启动图里的 Host release 识别该代，**完全不碰字体** |
+| `0.2.1-rc.4` | 同上 | 字体设置归 dsh 自己：字体 token 从 `:root` 挪到 `body`，General 新增字体与三档字号行。插件按页面启动图里的 Host release 识别该代，**完全不碰字体**。`rc.2 → rc.4` 只动了标题栏视图 tab 行与 Tooltip/Menu，契约面未变（[COMPAT-0.2.1-rc.4.md](COMPAT-0.2.1-rc.4.md)） |
 
 **基线跟着最新一代走**，理由很实际：旧代随时可能把插件依赖的东西删掉，而类型面看不见运行时早已走另一条分支的漂移。升基线时让 `npm run typecheck` 先暴露这类删除，比等用户在旧代上踩到更便宜。支持窗口约定为「当前基线 + 两代回退」（现在是 0.2.1 / 0.2.0 / 0.1.7），再老就删代码，不再平移兼容层。
 
@@ -177,13 +178,20 @@ node scripts/shots/verify-settings.mjs
 `latest` 标签与最新版常常不是一回事，所以「插件在新版上还行不行」要拿另一个版本来问，而不是升级全局那份：
 
 ```sh
-node scripts/dsh-version-lab.mjs 0.2.1-rc.2                 # 装到 ~/.dsh-versions/<版本>
+node scripts/dsh-version-lab.mjs 0.2.1-rc.4                 # 装到 ~/.dsh-versions/<版本>
 node scripts/dsh-version-lab.mjs --list                     # 已经装了哪些
-node scripts/dsh-version-lab.mjs 0.2.1-rc.2 -- node scripts/shots/verify-compat.mjs
-node scripts/dsh-version-lab.mjs 0.2.1-rc.2 -- node scripts/shots/verify-settings.mjs
+node scripts/dsh-version-lab.mjs 0.2.1-rc.4 -- node scripts/shots/verify-compat.mjs
+node scripts/dsh-version-lab.mjs 0.2.1-rc.4 -- node scripts/shots/verify-settings.mjs
 ```
 
 **必须装在仓库外**：`pnpm add` 会顺着 `pnpm-workspace.yaml` 往上找到仓库根，把整棵新版本的依赖树链进本仓库的 `node_modules` 并重解析 lock（类型基线当场就变）。清场用 `npm ci`。两个 dsh 同时在跑靠 `DSH_HOME` 与端口分开；探针一侧只认 `DSH_BIN`（默认 PATH 上的 `dsh`），两个探针开场都会写明打的是哪一对版本。
+
+这个脚本本身要 `pnpm`。**pnpm 在本机不可用**（没开开发者模式，建 store 索引时 `EPERM: symlink`），这时用 npm 装到仓库外，再靠 `DSH_BIN` 切过去，效果一样：
+
+```powershell
+npm.cmd install --prefix D:\dsh-rc2 @deepseek-ai/dsh@0.2.1-rc.2 --no-audit --no-fund
+$env:DSH_BIN='D:\dsh-rc2\node_modules\.bin\dsh.cmd'; node scripts/shots/verify-compat.mjs
+```
 
 ## 本地验证
 
@@ -196,7 +204,9 @@ node scripts/dsh-version-lab.mjs 0.2.1-rc.2 -- node scripts/shots/verify-setting
 
 两处经验：探针都**等结果**而不是等固定时长（乐观写与过 wire 的写落地时刻不同）；判「在不在会话页」看 `[data-slot="conversation.composer.dock"]` 是否存在，而不是看页面像不像会话——空会话的 hero 页不渲染这个槽位。
 
-**0.2.1 的两处探针适配**：设置入口从侧栏底部按钮挪进了账号菜单（探针两处入口都试）；会话文件升到 v4，`lab.mjs` 按投影缓存里的 `formatVersion` 选会话文件、找不到旧夹具时退回真实 home 里的任一可用会话。但新版 workspace 存储仍可能丢弃合成工作区，`verify-compat` 的会话段（dock / 余额条 / 面板）因此可能报「会话夹具没列进侧栏」并打印侧栏原文 —— 这是夹具待补，不是插件回归；同一轮里模块加载器、插件样式表、字体委托、两套 token 抽样都在它之前已经通过。
+**0.2.1 的两处探针适配**：设置入口从侧栏底部按钮挪进了账号菜单（探针两处入口都试）；会话文件升到 v4，`lab.mjs` 按投影缓存里的 `formatVersion` 选会话文件、找不到旧夹具时退回真实 home 里的任一可用会话。新版 workspace 存储如果丢弃合成工作区，`verify-compat` 的会话段（dock / 余额条 / 面板）会报「会话夹具没列进侧栏」并打印侧栏原文 —— 那是夹具问题，不是插件回归；模块加载器、插件样式表、字体委托、两套 token 抽样都在它之前就通过。
+
+**在 0.2.1-rc.4 上（2026-10-28）**：`verify-settings` 全部通过；`verify-compat` 除「用量信息」座位外全绿。那座座位要求会话的 `modelSelection` 投影带 provider，而空白会话的 `lastUsed` / `pending` 都是 `null` —— 探针现在优先挑「投影缓存里记着 `lastUsed`」的会话，但隔离 home 里模型列表拿不到时它仍可能不出现。同一份探针在 `0.2.1-rc.2` 上表现完全一致，所以这**不是 rc.4 的差异**。同一轮修掉了抽样表停在 0.4.1 之前的两条 token 期望值（详见 [COMPAT-0.2.1-rc.4.md](COMPAT-0.2.1-rc.4.md) §3）。
 
 余额链路可以完全不碰真实账号地走通：
 
@@ -212,9 +222,9 @@ node tests/balance-mock.mjs                    # 127.0.0.1:3099，返回上游�
 一行 `npm publish` 在这个仓库不够用：本机 `~/.npmrc` 的 registry 指向**只读**的腾讯镜像，而发布前有几项事实必须核查。`scripts/publish-npm.mjs` 把它们串成一条带闸门的流水线，**默认只核查不发布**：
 
 ```sh
-npm run release:check                        # 只核查：跑完六道闸门，打 tarball
+npm run release:check                        # 只核查：跑完全部闸门，打 tarball
 npm run release                              # 真发布（= ... --publish）
-npm run release -- --bump patch --smoke      # 升版发布 + 从 registry 冒烟装一遍
+npm run release -- --bump patch --smoke      # 升版发布 + 从 registry 冒烟装一遍（先写好 CHANGELOG）
 ```
 
 经 `npm run` 传参要放在 `--` 之后，否则 npm 会把参数当成自己的配置项。**PowerShell 里还有一个额外的坑**：`npm` 解析到的是 scoop/npm 生成的 `npm.ps1` shim，`--` 会在 PowerShell 这一层被吞掉，npm 收不到分隔符；npm 12 起不再只是警告，而是把 `--bump` 当未知配置直接报 `EUNKNOWNCONFIG`。改用 `.cmd` shim 或直接调脚本：
@@ -231,12 +241,26 @@ node scripts/publish-npm.mjs --publish --bump patch --smoke     # 或者绕开 n
 |---|---|---|
 | 1 | 工作树干净、在 main/master 上 | 发出去的东西对不上任何提交 |
 | 2 | `name` / `version` / `license` / `files` / `dsh` 段齐全，LICENSE 版权人不是占位符，`repository` 在 | 包页截图裂掉、dsh 认不出这是插件包 |
-| 3 | `typecheck` + `test` + `build` 全过 | 按 `package.json` 里的 script 跑 |
-| 4 | tarball 恰好是那 10 个文件 | 少了产物或混进 `src/` / `tests/` / `scripts/` |
-| 5 | registry 上没有这个版本、维护者包含当前登录身份 | 同版本重发会被拒、发到别人的包上会 403 |
-| 6 | `npm publish` | 默认跳过，`--publish` 才走 |
+| 3 | `--bump` 升版（可选） | 只改 `package.json` / `package-lock.json`，commit 与 tag 留到发布成功之后 |
+| 3.5 | CHANGELOG 里有该版本的条目 | 文档不再声明当前版本，这一节是唯一人工写的发布材料 |
+| 4 | `typecheck` + `test` + `build` 全过 | 按 `package.json` 里的 script 跑 |
+| 5 | tarball 恰好是那 12 个文件（两个 README、CHANGELOG、LICENSE、`cordis.patch.yml`、`lib/` 下 6 个产物、`package.json`） | 少了产物或 CHANGELOG，或混进 `src/` / `tests/` / `scripts/` |
+| 6 | registry 上没有这个版本、维护者包含当前登录身份 | 同版本重发会被拒、发到别人的包上会 403 |
+| 7 | `npm publish` | 默认跳过，`--publish` 才走 |
 
-几个设计点：**只有 `--publish` 一道确认**（早期多余的 `--yes` 已去掉，但老命令仍被接受并提示）；**`--bump` 只改 `package.json`**，git commit 与 `v<版本>` tag 放在发布成功之后打（发布失败不该留一个悬空的版本提交）；**凭据只在真要发布那一步碰**（`NPM_TOKEN` 被写成仓库级 `.npmrc`，发布结束立刻删掉）。
+几个设计点：**只有 `--publish` 一道确认**（早期多余的 `--yes` 已去掉，但老命令仍被接受并提示）；**`--bump` 只改版本元数据**（`package.json` 与 `package-lock.json`），git commit 与 `v<版本>` tag 放在发布成功之后打（发布失败不该留一个悬空的版本提交）；**凭据只在真要发布那一步碰**（`NPM_TOKEN` 被写成仓库级 `.npmrc`，发布结束立刻删掉）。
+
+### 版本号归脚本，版本历史归 CHANGELOG
+
+以前每份文档都有一句「当前发布是 X」，那句会腐——`--bump` 只改版本元数据，工作树闸门要求发布前干净，发布提交也只带 `package.json` / `package-lock.json` / `LICENSE`：流水线里没有任何一步会去同步文档，也没有事后提醒。于是不再追这个事实，而是把它从文档里删掉：
+
+- **最新版本**看 README 顶部的 npm badge（读的是 registry，不会过期）；
+- **逐版变化**看 [CHANGELOG.md](CHANGELOG.md)（进包，README 用相对链接指向它）；
+- **没有文档声明「当前发布是 X」**，所以也没有哪句需要每次发版手工改。
+
+发布前**唯一必须人工写的**是 CHANGELOG：把「未发布」一节改成 `## [x.y.z] - YYYY-MM-DD`，版本号要与 `--bump` 得出的结果一致，补上比较链接，**并作为独立提交先提交好**（工作树闸门在流程最前面就要求干净，指望发布提交带上是带不上的）。写漏了不用靠自觉：`--bump` 之后有一道 CHANGELOG 闸门，条目与 `package.json` 的版本对不上就停，并列出已有的版本。
+
+特性提交里不要手工改 `package.json` 的 `version`，也不要往文档里写版本号——版本号只有一个来源。
 
 本机前提（脚本会检查并在缺的时候给出确切命令）：`npm login` 与 `npm publish` 都必须显式带 `--registry https://registry.npmjs.org/`，否则 login 会去登录镜像、publish 会往镜像推；`~/.npmrc` 的 `proxy` / `https-proxy` / `strict-ssl=false` 脚本原样继承，不覆盖。
 

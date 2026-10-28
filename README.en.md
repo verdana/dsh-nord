@@ -1,8 +1,12 @@
 # dsh-nord
 
+[![npm latest version](https://img.shields.io/npm/v/dsh-nord.svg)](https://www.npmjs.com/package/dsh-nord)
+
 [中文](https://github.com/verdana/dsh-nord/blob/main/README.md) | **English**
 
 A Nord repaint for the [dsh](https://github.com/deepseek-ai/deepseek-harness) Web GUI: the Nord palette, a settings page of its own, and a DeepSeek balance readout under the composer. From dsh **0.2.1** the host manages fonts and sizes itself; on 0.1.7 / 0.2.0 this plugin still provides font replacement. Only dsh **0.1.7 / 0.2.0 / 0.2.1** are supported; `≤ 0.1.5` has been unsupported since 0.4.0.
+
+> Version and per-release changes live in [CHANGELOG.md](./CHANGELOG.md); the latest version on npm is the badge above.
 
 ![Nord theme (dark)](assets/01-theme.png)
 
@@ -26,14 +30,14 @@ A Nord repaint for the [dsh](https://github.com/deepseek-ai/deepseek-harness) We
 
 ## Requirements
 
-- Supported dsh: **`0.2.1-rc.2`** (the build baseline, tested on a live instance), **`0.2.0-rc.2`**, and **`0.1.7-rc.2`**, each tested as well; **`≤ 0.1.5` has been unsupported since 0.4.0** — see [Compatibility](#compatibility).
+- Supported dsh: **`0.2.1-rc.4`** (the build baseline, tested on a live instance), **`0.2.0-rc.2`**, and **`0.1.7-rc.2`**, each tested as well; **`≤ 0.1.5` has been unsupported since 0.4.0** — see [Compatibility](#compatibility).
 - The balance readout needs `DEEPSEEK_API_KEY` (resolved through dsh's credentials service). Without credentials the bar shows an error message; theme, fonts, and settings are unaffected.
 
 ### Compatibility
 
 | dsh | Status | Fonts |
 |---|---|---|
-| `0.2.1` | Build baseline, tested | Font family and size are managed by dsh's own settings; the plugin injects none |
+| `0.2.1` | Build baseline (`rc.4` tested) | Font family and size are managed by dsh's own settings; the plugin injects none |
 | `0.2.0` | Tested | The plugin provides font replacement (interface / code fonts) |
 | `0.1.7` | Tested | Same as above |
 | `≤ 0.1.5` | **Unsupported since 0.4.0** (every `0.1.5-rc.1` / `rc.2` / `rc.3` and older) | — |
@@ -47,11 +51,11 @@ The floor is also declared in `package.json` as `engines.dsh` (`>=0.1.7-0`): dsh
 From npm:
 
 ```sh
-dsh plugin --profile web add dsh-nord@^0.4.0
+dsh plugin --profile web add dsh-nord
 dsh web
 ```
 
-Write a range like `^0.4.0` rather than letting pnpm resolve `latest`. Since pnpm 11 there is a 24-hour "new version cooldown": while a release is less than a day old, `@latest` does not resolve to it and silently installs the previous version instead (an easy trap right after publishing). For an exact version, spell it out: `dsh-nord@0.4.0`.
+Without a version, pnpm resolves the `latest` tag. Note that pnpm 11 introduces a 24-hour "new version cooldown": while a release is less than a day old, `@latest` does not resolve to it and silently installs the previous version instead (an easy trap right after publishing). For an exact version, spell it out — the number is in the badge above or in [CHANGELOG.md](./CHANGELOG.md), e.g. `dsh-nord@<version>`.
 
 From this repository's source:
 
@@ -80,7 +84,7 @@ Uninstall: `dsh plugin --profile web remove dsh-nord`.
 
 ```sh
 dsh plugin --profile web remove dsh-nord
-dsh plugin --profile web add dsh-nord@^0.4.0
+dsh plugin --profile web add dsh-nord
 ```
 
 If dsh is still on `≤ 0.1.5`, do not move to 0.4.x: upgrade dsh to 0.1.7 or newer first, or stay on plugin 0.3.x (0.1.5 does not read `engines.dsh`, so it will not block this install).

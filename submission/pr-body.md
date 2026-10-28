@@ -6,7 +6,7 @@ Adds one entry: `verdana/dsh-nord` → category `theme`.
 <https://github.com/verdana/dsh-nord/blob/main/package.json> ·
 <https://github.com/verdana/dsh-nord/blob/main/cordis.patch.yml>
 
-**Repository.** Created 2026-09-20, 33 commits, 5 releases (latest 0.4.0 on 2026-10-18). The `dsh-plugin` topic is set. `lib/` is prebuilt and shipped in the package, so installs need no `allowBuilds` approval. Also published as `dsh-nord` on npm (latest 0.4.0), with `repository` pointing back at this repo.
+**Repository.** Created 2026-09-20 and actively released since — the current version is the npm badge on the README, the per-release history is in `CHANGELOG.md`. The `dsh-plugin` topic is set. `lib/` is prebuilt and shipped in the package, so installs need no `allowBuilds` approval. Also published as `dsh-nord` on npm, with `repository` pointing back at this repo.
 
 **Screenshots.** `screenshots.json` at the repository root lists `assets/01-theme.png`, `assets/02-settings.png`, `assets/03-balance.png`.
 
@@ -25,7 +25,7 @@ Adds one entry: `verdana/dsh-nord` → category `theme`.
 
 插件做三件事：给 dsh Web GUI 换 Nord 配色（浅色 / 深色两套 token 一起覆盖）；提供独立的「Nord 主题」设置页；composer 下方一行 DeepSeek 余额读数，点击出明细面板。dsh 0.2.1 之前还提供界面 / 代码字体替换，0.2.1 起字体由 dsh 自己管理，插件不再注入任何字体样式。
 
-清单：仓库根 `package.json` 声明 `dsh.bundle` → `./cordis.patch.yml`。仓库创建于 2026-09-20，33 次提交、5 个 release（最新 0.4.0，2026-10-18），已加 `dsh-plugin` topic，`lib/` 预构建随包发布（安装无需 `allowBuilds` 授权），npm 上为 `dsh-nord@0.4.0` 且 `repository` 指回本仓库。
+清单：仓库根 `package.json` 声明 `dsh.bundle` → `./cordis.patch.yml`。仓库创建于 2026-09-20，自那以后持续提交与发版（当前版本见 npm badge，逐版历史见 `CHANGELOG.md`），已加 `dsh-plugin` topic，`lib/` 预构建随包发布（安装无需 `allowBuilds` 授权），npm 上为 `dsh-nord` 且 `repository` 指回本仓库。
 
 分类取 `theme`：主题是这个插件的本职，设置页与余额条是随主题一起装的部分；它不是纯聚合包。
 
