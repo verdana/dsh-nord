@@ -6,7 +6,7 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循
 [语义化版本](https://semver.org/lang/zh-CN/)。
 
-## [未发布]
+## [0.4.2] - 2026-10-28
 
 ### 新增
 
@@ -98,7 +98,8 @@
 
 - markdown 宽表格：鼠标停在底边时不再抖动；代价是横向放不下的宽表格常驻一条横向滚动条。
 
-[未发布]: https://github.com/verdana/dsh-nord/compare/v0.4.1...HEAD
+[未发布]: https://github.com/verdana/dsh-nord/compare/v0.4.2...HEAD
+[0.4.2]: https://github.com/verdana/dsh-nord/compare/v0.4.1...v0.4.2
 [0.4.1]: https://github.com/verdana/dsh-nord/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/verdana/dsh-nord/compare/v0.3.1...v0.4.0
 [0.3.1]: https://github.com/verdana/dsh-nord/compare/v0.3.0...v0.3.1
