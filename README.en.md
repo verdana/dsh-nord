@@ -30,14 +30,14 @@ A Nord repaint for the [dsh](https://github.com/deepseek-ai/deepseek-harness) We
 
 ## Requirements
 
-- Supported dsh: **`0.2.1-rc.4`** (the build baseline, tested on a live instance), **`0.2.0-rc.2`**, and **`0.1.7-rc.2`**, each tested as well; **`≤ 0.1.5` has been unsupported since 0.4.0** — see [Compatibility](#compatibility).
+- Supported dsh: **`0.2.1-rc.5`** (the build baseline, tested on a live instance), **`0.2.0-rc.2`**, and **`0.1.7-rc.2`**, each tested as well; **`≤ 0.1.5` has been unsupported since 0.4.0** — see [Compatibility](#compatibility).
 - The balance readout needs `DEEPSEEK_API_KEY` (resolved through dsh's credentials service). Without credentials the bar shows an error message; theme, fonts, and settings are unaffected.
 
 ### Compatibility
 
 | dsh | Status | Fonts |
 |---|---|---|
-| `0.2.1` | Build baseline (`rc.4` tested) | Font family and size are managed by dsh's own settings; the plugin injects none |
+| `0.2.1` | Build baseline (`rc.5` tested) | Font family and size are managed by dsh's own settings; the plugin injects none |
 | `0.2.0` | Tested | The plugin provides font replacement (interface / code fonts) |
 | `0.1.7` | Tested | Same as above |
 | `≤ 0.1.5` | **Unsupported since 0.4.0** (every `0.1.5-rc.1` / `rc.2` / `rc.3` and older) | — |

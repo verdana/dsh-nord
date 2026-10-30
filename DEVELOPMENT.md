@@ -139,15 +139,15 @@ div[data-slot="conversation.composer.dock"]:has(> [data-dsh-nord-bar]) {
 
 ## 版本现实
 
-本插件的**构建基线是 `0.2.1-rc.4`**，并**同时支持 `0.1.7-rc.2` 与 `0.2.0-rc.2`**；每一代都用两个探针实跑过（rc.4 上设置页探针全过、接口探针 8/9，「用量信息」座位仍在等一条有真实请求的夹具；0.1.7 / 0.2.0 上是完整的两套。见「本地验证」）。**`≤ 0.1.5`（含 `0.1.5-rc.1` / `rc.2` / `rc.3` 及更早）不再支持**——那一代没有 `configForms`，命名空间要靠 `installSection` + `settingsScope` 另一套接口，代码为此维护了两份 schema 与双份设置传输；而 dsh 发布频繁，没有必要为远古版本养一条并行分支。（`schemastery` 不用 dsh 的版本号，单独钉在 `3.18.5`，因为 `.volatile()` 是它才有的方法。）
+本插件的**构建基线是 `0.2.1-rc.5`**，并**同时支持 `0.1.7-rc.2` 与 `0.2.0-rc.2`**；每一代都用两个探针实跑过（rc.5 上设置页探针全过、接口探针 8/9，「用量信息」座位仍在等一条有真实请求的夹具；0.1.7 / 0.2.0 上是完整的两套。见「本地验证」）。**`≤ 0.1.5`（含 `0.1.5-rc.1` / `rc.2` / `rc.3` 及更早）不再支持**——那一代没有 `configForms`，命名空间要靠 `installSection` + `settingsScope` 另一套接口，代码为此维护了两份 schema 与双份设置传输；而 dsh 发布频繁，没有必要为远古版本养一条并行分支。（`schemastery` 不用 dsh 的版本号，单独钉在 `3.18.5`，因为 `.volatile()` 是它才有的方法。）
 
-**支持下限同时写进 `package.json` 的 `engines.dsh: ">=0.1.7-0"`**：dsh 0.2.1 起安装/启动会按它判定兼容性（`engines.dsh` 存在时独占判定、忽略 `peerDependencies`；预发布版本参与区间比较，所以下限写成 `-0` 才能收下 `0.1.7-rc.2`），不满足时拒绝并提示 `dsh plugin allow-version` 豁免；0.1.7 / 0.2.0 的装载器不读这个字段，所以那两个版本照常可用（0.1.5 也不读，因此它拦不住 0.4.x 的安装——那里只能靠文档劝退，请用 0.3.x）。改这个区间前先拿 `packages/boot/app-boot/src/plugin-compatibility.ts` 的 `evaluatePluginCompatibility()` 对四个版本（`0.1.5-rc.3` 应被拒，`0.1.7-rc.2` / `0.2.0-rc.2` / `0.2.1-rc.4` 应通过）各跑一遍。
+**支持下限同时写进 `package.json` 的 `engines.dsh: ">=0.1.7-0"`**：dsh 0.2.1 起安装/启动会按它判定兼容性（`engines.dsh` 存在时独占判定、忽略 `peerDependencies`；预发布版本参与区间比较，所以下限写成 `-0` 才能收下 `0.1.7-rc.2`），不满足时拒绝并提示 `dsh plugin allow-version` 豁免；0.1.7 / 0.2.0 的装载器不读这个字段，所以那两个版本照常可用（0.1.5 也不读，因此它拦不住 0.4.x 的安装——那里只能靠文档劝退，请用 0.3.x）。改这个区间前先拿 `packages/boot/app-boot/src/plugin-compatibility.ts` 的 `evaluatePluginCompatibility()` 对四个版本（`0.1.5-rc.3` 应被拒，`0.1.7-rc.2` / `0.2.0-rc.2` / `0.2.1-rc.5` 应通过）各跑一遍。
 
 | dsh | 设置命名空间 | 备注 |
 |---|---|---|
 | `0.1.7-rc.2` | Loader 从条目导出的 `Config` 自动派生，写 profile 的 `cordis.patch.yml`；浏览器 `ctx.configForms.get()` | 支持的最老一代 |
 | `0.2.0-rc.2` | 同上 | 配色表新增 8 枚 alias token |
-| `0.2.1-rc.4` | 同上 | 字体设置归 dsh 自己：字体 token 从 `:root` 挪到 `body`，General 新增字体与三档字号行。插件按页面启动图里的 Host release 识别该代，**完全不碰字体**。`rc.2 → rc.4` 只动了标题栏视图 tab 行与 Tooltip/Menu，契约面未变（[COMPAT-0.2.1-rc.4.md](COMPAT-0.2.1-rc.4.md)） |
+| `0.2.1-rc.5` | 同上 | 字体设置归 dsh 自己：字体 token 从 `:root` 挪到 `body`，General 新增字体与三档字号行。插件按页面启动图里的 Host release 识别该代，**完全不碰字体**。`rc.2 → rc.4` 只动了标题栏视图 tab 行与 Tooltip/Menu；`rc.4 → rc.5` 只有整仓版本号 bump 加一处思考块渲染改造（`conversation.chat.reasoning.body` 的 owner props 多一个 `rawText`），插件不站那条槽位 —— 两轮契约面都未变（[COMPAT-0.2.1-rc.5.md](COMPAT-0.2.1-rc.5.md)、[COMPAT-0.2.1-rc.4.md](COMPAT-0.2.1-rc.4.md)） |
 
 **基线跟着最新一代走**，理由很实际：旧代随时可能把插件依赖的东西删掉，而类型面看不见运行时早已走另一条分支的漂移。升基线时让 `npm run typecheck` 先暴露这类删除，比等用户在旧代上踩到更便宜。支持窗口约定为「当前基线 + 两代回退」（现在是 0.2.1 / 0.2.0 / 0.1.7），再老就删代码，不再平移兼容层。
 
@@ -165,6 +165,12 @@ node scripts/shots/verify-compat.mjs
 node scripts/shots/verify-settings.mjs
 ```
 
+**升级时 `npm install` 报 `ERESOLVE` 是常事，别用 `--force` 糊过去**：`@deepseek-ai/dsh-*` 之间是
+精确版本的 peer 关系（例如 `dsh-settings@rc.5` peer `dsh-brand@0.2.1-rc.5`），而那些 peer 目标多是
+**传递依赖**、不在本仓库的 `package.json` 里，npm 不会主动替它们跟着升，于是解析器把「树里还剩旧
+版本」判成冲突。rc.4 → rc.5 就撞了一次。干净解法是先删 `node_modules` 与 `package-lock.json`
+再装 —— 两者都是可再生资产，比 `--force` 留下半新半旧的树可靠。
+
 **五处类型与探针都看不见、升级时值得主动查的东西：**
 
 - **新增的配色 token。** 上游只往 `ui-theme/src/styles/design-platform.css` 里加，而探针只抽样 9 项，抽不到新加的。做法是拿两个 tag 比这份文件（`git diff dsh-v<旧>..dsh-v<新> -- packages/client/ui-theme/src/styles/design-platform.css`）：新增的 alias 若没被这层覆盖，就会露出非 Nord 的颜色。0.2.0 加了 8 枚，其中 4 枚靠 `var()` 间接命中、4 枚需要补。
@@ -178,10 +184,10 @@ node scripts/shots/verify-settings.mjs
 `latest` 标签与最新版常常不是一回事，所以「插件在新版上还行不行」要拿另一个版本来问，而不是升级全局那份：
 
 ```sh
-node scripts/dsh-version-lab.mjs 0.2.1-rc.4                 # 装到 ~/.dsh-versions/<版本>
+node scripts/dsh-version-lab.mjs 0.2.1-rc.5                 # 装到 ~/.dsh-versions/<版本>
 node scripts/dsh-version-lab.mjs --list                     # 已经装了哪些
-node scripts/dsh-version-lab.mjs 0.2.1-rc.4 -- node scripts/shots/verify-compat.mjs
-node scripts/dsh-version-lab.mjs 0.2.1-rc.4 -- node scripts/shots/verify-settings.mjs
+node scripts/dsh-version-lab.mjs 0.2.1-rc.5 -- node scripts/shots/verify-compat.mjs
+node scripts/dsh-version-lab.mjs 0.2.1-rc.5 -- node scripts/shots/verify-settings.mjs
 ```
 
 **必须装在仓库外**：`pnpm add` 会顺着 `pnpm-workspace.yaml` 往上找到仓库根，把整棵新版本的依赖树链进本仓库的 `node_modules` 并重解析 lock（类型基线当场就变）。清场用 `npm ci`。两个 dsh 同时在跑靠 `DSH_HOME` 与端口分开；探针一侧只认 `DSH_BIN`（默认 PATH 上的 `dsh`），两个探针开场都会写明打的是哪一对版本。
@@ -206,7 +212,7 @@ $env:DSH_BIN='D:\dsh-rc2\node_modules\.bin\dsh.cmd'; node scripts/shots/verify-c
 
 **0.2.1 的两处探针适配**：设置入口从侧栏底部按钮挪进了账号菜单（探针两处入口都试）；会话文件升到 v4，`lab.mjs` 按投影缓存里的 `formatVersion` 选会话文件、找不到旧夹具时退回真实 home 里的任一可用会话。新版 workspace 存储如果丢弃合成工作区，`verify-compat` 的会话段（dock / 余额条 / 面板）会报「会话夹具没列进侧栏」并打印侧栏原文 —— 那是夹具问题，不是插件回归；模块加载器、插件样式表、字体委托、两套 token 抽样都在它之前就通过。
 
-**在 0.2.1-rc.4 上（2026-10-28）**：`verify-settings` 全部通过；`verify-compat` 除「用量信息」座位外全绿。那座座位要求会话的 `modelSelection` 投影带 provider，而空白会话的 `lastUsed` / `pending` 都是 `null` —— 探针现在优先挑「投影缓存里记着 `lastUsed`」的会话，但隔离 home 里模型列表拿不到时它仍可能不出现。同一份探针在 `0.2.1-rc.2` 上表现完全一致，所以这**不是 rc.4 的差异**。同一轮修掉了抽样表停在 0.4.1 之前的两条 token 期望值（详见 [COMPAT-0.2.1-rc.4.md](COMPAT-0.2.1-rc.4.md) §3）。
+**在 0.2.1-rc.5 上（2026-10-30）**：`verify-settings` 全部通过；`verify-compat` 除「用量信息」座位外全绿（8/9），并且这次重建的 `lib/` 五个产物与升级前**逐字节相同**。那座座位要求会话的 `modelSelection` 投影带 provider，而空白会话的 `lastUsed` / `pending` 都是 `null` —— 探针优先挑「投影缓存里记着 `lastUsed`」的会话，但隔离 home 里模型列表拿不到时它仍不出现。同一份探针在 `0.2.1-rc.2` / `rc.4` 上表现完全一致，所以这是**夹具缺口而不是版本差异**（详见 [COMPAT-0.2.1-rc.5.md](COMPAT-0.2.1-rc.5.md) §3）。上一轮修掉了抽样表停在 0.4.1 之前的两条 token 期望值（[COMPAT-0.2.1-rc.4.md](COMPAT-0.2.1-rc.4.md) §3）。
 
 余额链路可以完全不碰真实账号地走通：
 

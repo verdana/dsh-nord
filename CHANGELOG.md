@@ -6,6 +6,15 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循
 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [未发布]
+
+### 文档 / 工程
+
+- 兼容性核查推进到 dsh `0.2.1-rc.5`：依赖基线从 `0.2.1-rc.4` 升到 `0.2.1-rc.5`。这一版上游只有
+  整仓版本号 bump 加一处思考块渲染改造（`conversation.chat.reasoning.body` 的 owner props 多一个
+  `rawText`，整块只有 `<signature>` 头时不再渲染），插件不站那条槽位，契约面未变、源码无需改动；
+  重新构建的 `lib/` 与升级前逐字节相同（见 [COMPAT-0.2.1-rc.5.md](./COMPAT-0.2.1-rc.5.md)）。
+
 ## [0.4.2] - 2026-10-28
 
 ### 新增
