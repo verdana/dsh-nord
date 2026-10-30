@@ -1,7 +1,7 @@
 # dsh-nord × dsh 0.2.1-rc.2 兼容性清查
 
 > 这是 2026-10-18 那一轮的存档：结论、证据与当时的建议都保持原样，不再随上游更新。
-> **当前基线与最新一轮核查见 [COMPAT-0.2.1-rc.4.md](./COMPAT-0.2.1-rc.4.md)。**
+> **当前基线与最新一轮核查见 [COMPAT-0.2.1-rc.5.md](./COMPAT-0.2.1-rc.5.md)。**
 
 - 审计对象：`dsh-nord` 0.3.1（本仓库），构建基线 dsh `0.2.0-rc.2`
 - 目标版本：dsh `0.2.1-rc.2`（工作树 `D:\deepseek-harness`，HEAD `d1b9c04067`；npm dist-tag `next`）
