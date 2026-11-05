@@ -143,29 +143,48 @@ try {
   ok('独立页面', `标题「${page1.heading}」，分组 ${page1.groups.join(' / ')}`)
   ok('整页落在内容列内', `高 ${Math.round(page1.rootHeight)}px / 列 ${page1.columnHeight}px，宽 ${Math.round(page1.rootWidth)}px，无滚动`)
 
-  // ── 左栏图标：shell 只认自己的分区 id，第三方行回落齿轮，插件自己画 ──────────
+  // ── 左栏图标：0.2.2 有 `settings.section.icon` 槽位，更早的宿主只能打 DOM 补丁 ──
+  // 两条路都要「有且只有一个调色板字形」：槽位那条由 shell 摆进 `span[aria-hidden]`，
+  // 齿轮根本不渲染；没有槽位的宿主走标记 + `::before` mask，齿轮被藏掉。0.2.2 上
+  // 这两条同时生效过一次——齿轮留着、颜料盘又叠了一个，这里是那道回归闸。
   const railRow = await page.evaluate(() => {
     const row = [...document.querySelectorAll('[role="dialog"] nav button')]
       .find((el) => el.innerText.trim() === 'Nord 主题')
     if (row === undefined) return null
     const glyph = getComputedStyle(row, '::before')
-    const shellIcon = row.querySelector(':scope > svg')
     return {
       marked: row.hasAttribute('data-dsh-nord-nav'),
-      gearHidden: shellIcon !== null && getComputedStyle(shellIcon).display === 'none',
+      contributed: row.querySelector('[data-dsh-nord-icon]') !== null,
       glyph: glyph.maskImage || glyph.webkitMaskImage || '',
       glyphSize: `${glyph.width}×${glyph.height}`,
       color: glyph.backgroundColor,
+      svgs: [...row.querySelectorAll('svg')].map((el) => {
+        const box = el.getBoundingClientRect()
+        return {
+          own: el.hasAttribute('data-dsh-nord-icon'),
+          display: getComputedStyle(el).display,
+          box: `${Math.round(box.width)}×${Math.round(box.height)}`,
+        }
+      }),
     }
   })
   if (railRow === null) throw new Error('左栏找不到「Nord 主题」那一行')
-  if (!railRow.marked) throw new Error('本插件那一行没有导航标记，图标补丁没生效')
-  if (!railRow.gearHidden) throw new Error('本插件那一行的默认齿轮图标没有被隐藏')
-  if (!railRow.glyph.startsWith('url("data:image/svg+xml')) {
-    throw new Error(`导航图标没有画成自己的字形：${railRow.glyph.slice(0, 80)}`)
+  const painted = railRow.svgs.filter((svg) => svg.display !== 'none')
+  if (railRow.contributed) {
+    if (railRow.marked) throw new Error('槽位已经画了图标，这一行不该再被打上 DOM 补丁标记（会出现两个字形）')
+    if (painted.length !== 1) throw new Error(`左栏那一行应只有一个图标，实际 ${JSON.stringify(railRow.svgs)}`)
+    if (!painted[0].own) throw new Error(`剩下的图标不是本插件的调色板：${JSON.stringify(painted)}`)
+    if (painted[0].box !== '16×16') throw new Error(`槽位图标尺寸不是 16×16：${painted[0].box}`)
+    ok('左栏图标', `槽位给出 ${painted[0].box}，齿轮未渲染，行未被补丁标记`)
+  } else {
+    if (!railRow.marked) throw new Error('本插件那一行没有导航标记，图标补丁没生效')
+    if (painted.length !== 0) throw new Error(`默认齿轮没有被隐藏：${JSON.stringify(painted)}`)
+    if (!railRow.glyph.startsWith('url("data:image/svg+xml')) {
+      throw new Error(`导航图标没有画成自己的字形：${railRow.glyph.slice(0, 80)}`)
+    }
+    if (railRow.glyphSize !== '16px×16px') throw new Error(`导航图标尺寸不是 16px：${railRow.glyphSize}`)
+    ok('左栏图标', `自有字形 ${railRow.glyphSize}，齿轮已隐藏，颜色 ${railRow.color}`)
   }
-  if (railRow.glyphSize !== '16px×16px') throw new Error(`导航图标尺寸不是 16px：${railRow.glyphSize}`)
-  ok('左栏图标', `自有字形 ${railRow.glyphSize}，齿轮已隐藏，颜色 ${railRow.color}`)
 
   // ── 页脚：一条分隔线 + 当前版本号（版本读自 package.json，与构建期 define 同源）──
   const VERSION = JSON.parse(readFileSync(join(ROOT, 'package.json'), 'utf8')).version

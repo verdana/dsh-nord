@@ -17,7 +17,8 @@ import { fontStacks } from '../fonts.ts'
 import { BalanceBar } from './BalanceBar.tsx'
 import { detectHostFonts } from './host-fonts.ts'
 import { en, LOCALE_NS, zh } from './locales.ts'
-import { FONT_STYLE_ID, fontStylesheet, NAV_ATTR, NAV_STYLE_ID, navStylesheet, nordTokens, SECTION_ID, SECTION_ORDER, SURFACE_STYLE_ID, surfaceStylesheet, TABLE_STYLE_ID, tableStylesheet, TOKEN_SOURCE } from './nord.ts'
+import { ICON_ATTR, NAV_ATTR, NAV_STYLE_ID, NavIcon, navStylesheet } from './nav-icon.tsx'
+import { FONT_STYLE_ID, fontStylesheet, nordTokens, SECTION_ID, SECTION_ORDER, SURFACE_STYLE_ID, surfaceStylesheet, TABLE_STYLE_ID, tableStylesheet, TOKEN_SOURCE } from './nord.ts'
 import { NordSection } from './NordSection.tsx'
 import { mountSettings } from './settings.ts'
 import { createNordBalanceStore, createNordSettingsStore } from './stores.ts'
@@ -111,10 +112,21 @@ export function apply(ctx: ClientContext): void {
       return () => { element.remove() }
     }, 'dsh-nord: wide-table scroll patch')
 
-    // The settings rail glyph. The shell maps section ids to icons itself and
-    // gives every third-party id the generic gear; the slot contract carries no
-    // icon, so the one nav row this plugin owns is marked in the DOM. See
-    // `navStylesheet` for the drawing and why the mark is an attribute.
+    // The settings rail glyph. dsh 0.2.2 carries one for this: a
+    // `settings.section.icon` entry addressed by this section's id, rendered by
+    // the shell in place of the gear it gives every unrecognised id. The
+    // injection waits for that slot, so on 0.1.7 / 0.2.0 / 0.2.1 — which declare
+    // no such slot — this callback simply never runs and the DOM patch below
+    // draws the glyph instead. See `nav-icon.tsx`.
+    ctx.slots.inject('settings.section.icon', () => ctx.slots.register({
+      name: 'settings.section.icon',
+      id: SECTION_ID,
+    }, NavIcon))
+
+    // That DOM patch, for the older generations: mark the one nav row this
+    // plugin owns and skin it there. A row that already carries the contributed
+    // icon is left alone — that is how a host which renders the slot above keeps
+    // one glyph instead of two.
     ctx.effect(() => {
       const element = document.createElement('style')
       element.id = NAV_STYLE_ID
@@ -139,6 +151,11 @@ export function apply(ctx: ClientContext): void {
       const mark = (): void => {
         for (const button of railButtons()) {
           if (button.hasAttribute(NAV_ATTR)) continue
+          // A host that renders the `settings.section.icon` contribution already
+          // draws this plugin's glyph; marking the row as well would put the
+          // patch's ::before beside it — the gear-plus-palette pair 0.2.2 showed
+          // before this check existed.
+          if (button.querySelector(`[${ICON_ATTR}]`) !== null) continue
           if (!labels.has(button.textContent?.trim() ?? '')) continue
           button.setAttribute(NAV_ATTR, '')
         }
