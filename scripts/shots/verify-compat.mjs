@@ -107,12 +107,16 @@ const TOKENS = [
   ['--dsw-alias-label-primary', '#2E3440', '#ECEFF4'],
   ['--dsw-alias-label-tertiary', '#4C566A', '#8E9AAD'],
   ['--dsw-alias-brand-primary', '#5E81AC', '#88C0D0'],
-  // error 文本是 color-mix：自定义属性在计算样式里保留声明原文，所以这里比的是同一条式子
+  // error 与 done 文本都是 color-mix：自定义属性在计算样式里保留声明原文，所以这里比的是同一条式子
   ['--dsw-alias-state-error-primary', 'color-mix(in srgb, #bf616a 75%, #2e3440)', 'color-mix(in srgb, #bf616a 65%, #eceff4)'],
+  ['--dsw-alias-state-done-primary', 'color-mix(in srgb, #b48ead 55%, #2e3440)', 'color-mix(in srgb, #b48ead 85%, #eceff4)'],
   ['--dsw-static-neutral-00', '#ECEFF4', '#2E3440'],
   ['--dsw-static-deepseek-500', '#5E81AC', '#88C0D0'],
   ['--dsw-specific-sidebar-fill', '#E5E9F0', '#3B4252'],
   ['--dsw-specific-input-major', '#ECEFF4', '#3B4252'],
+  // 0.2.2 的空状态插画套件：六个 token 里取两枚代表（正片与细节线）
+  ['--dsw-alias-illustration-surface', '#ECEFF4', '#434C5E'],
+  ['--dsw-alias-illustration-detail', 'color-mix(in srgb, #d8dee9 75%, #4c566a)', 'color-mix(in srgb, #d8dee9 35%, #434c5e)'],
 ]
 
 /** 一个颜色字符串的规范形，用于跨 hex / rgb() 比较。 */

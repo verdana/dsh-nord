@@ -51,6 +51,8 @@ const FROST_STRONG = 'color-mix(in srgb, #5E81AC 70%, #2E3440)' // #506A8C — 4
 const FROST_PRESSED = 'color-mix(in srgb, #5E81AC 60%, #2E3440)' // #4B6281 — 5.41:1 on nord6
 const ERROR_TEXT_LIGHT = 'color-mix(in srgb, #BF616A 75%, #2E3440)' // #9B5660 — 4.70:1 on nord6
 const ERROR_TEXT_DARK = 'color-mix(in srgb, #BF616A 65%, #ECEFF4)' // #CF939A — 4.92:1 on nord0
+const DONE_TEXT_LIGHT = 'color-mix(in srgb, #B48EAD 55%, #2E3440)' // #78667C — 4.57:1 on nord6
+const DONE_TEXT_DARK = 'color-mix(in srgb, #B48EAD 85%, #ECEFF4)' // #BC9DB8 — 5.15:1 on nord0
 
 /** Layer identity for the token override the theme service stacks. */
 export const TOKEN_SOURCE = 'dsh-nord'
@@ -188,6 +190,11 @@ const TOKENS: readonly (readonly [name: string, light: string, dark: string])[] 
   // toast, so it can be shaded per mode to clear 4.5:1.
   ['--dsw-alias-state-error-primary', ERROR_TEXT_LIGHT, ERROR_TEXT_DARK],
   ['--dsw-alias-state-error-secondary', ERROR_TEXT_LIGHT, ERROR_TEXT_DARK],
+  // dsh 0.2.2 added a fourth state colour, `done` (violet upstream; the tone a
+  // finished Forge run wears). It is used as label text, so it gets the same
+  // per-mode shading error does rather than a bare nord15 — nord15 alone stops at
+  // 2.5:1 on nord6 and 4.4:1 on nord0.
+  ['--dsw-alias-state-done-primary', DONE_TEXT_LIGHT, DONE_TEXT_DARK],
   ['--dsw-alias-state-success-primary', P.nord14, P.nord14],
   ['--dsw-alias-state-success-secondary', P.nord14, P.nord14],
   ['--dsw-alias-state-success-tertiary', 'rgba(163, 190, 140, 0.18)', 'rgba(163, 190, 140, 0.18)'],
@@ -222,7 +229,6 @@ const TOKENS: readonly (readonly [name: string, light: string, dark: string])[] 
   ['--dsw-specific-sidebar-fill', P.nord5, P.nord1],
   ['--dsw-specific-sidebar-nav-item-active-accent', 'rgba(94, 129, 172, 0.18)', 'rgba(136, 192, 208, 0.16)'],
   ['--dsw-specific-sidebar-nav-item-active', P.nord4, P.nord2],
-  ['--dsw-specific-sidebar-nav-item-hover', P.nord4, P.nord2],
   ['--dsw-specific-tip', P.nord5, P.nord2],
 
   // Raw-scale patch: consumers that bypass the alias layer.
@@ -278,6 +284,31 @@ const TOKENS: readonly (readonly [name: string, light: string, dark: string])[] 
   ['--dsw-alias-label-shimmer', 'rgba(46, 52, 64, 0.3)', 'rgba(216, 222, 233, 0.45)'],
   ['--dsw-alias-label-deep-diving', 'color-mix(in srgb, #5E81AC 70%, #2E3440)', P.nord8],
   ['--dsw-alias-label-deep-diving-shimmer', 'color-mix(in srgb, #5E81AC 30%, #2E3440)', 'color-mix(in srgb, #ECEFF4 65%, #8FBCBB)'],
+
+  // dsh 0.2.2 additions: one illustration kit. The Schedule page's empty state
+  // draws a document-and-clock artwork from six alias tokens, and their upstream
+  // values are blue-grey rungs of the raw scale this layer does not patch — on
+  // Nord's dark canvas the "paper" would read as a neutral grey card rather than
+  // a sheet of the same material.
+  //
+  // The six keep their own jobs: `background` is the soft blob behind the sheet
+  // (one step off the page), `backing` the rotated sheet underneath, `surface`
+  // the front sheet, `detail` the ruled lines and clock hand, `inset` the clock
+  // face carved out of `detail`, and `shadow` the ground ellipse. Light mode
+  // reproduces upstream's layering (`inset` == `surface`, as there); dark mode
+  // inverts it the way upstream does, with `inset` falling back to the backing
+  // tone. Polar night offers only four steps of usable darkness where upstream
+  // ramps through five, so the dark `backing` is a mix between nord1 and nord0 —
+  // it has to stay under `surface` (a sheet tucked behind the front one) without
+  // collapsing onto the page. `detail` is a mix for the same reason: taking a
+  // bare rung would jump the line-to-paper ratio from upstream's ~1.5:1 straight
+  // to 3:1 or worse, which reads as ink rather than print.
+  ['--dsw-alias-illustration-background', P.nord5, P.nord1],
+  ['--dsw-alias-illustration-backing', P.nord4, 'color-mix(in srgb, #3B4252 50%, #2E3440)'],
+  ['--dsw-alias-illustration-surface', P.nord6, P.nord2],
+  ['--dsw-alias-illustration-detail', 'color-mix(in srgb, #D8DEE9 75%, #4C566A)', 'color-mix(in srgb, #D8DEE9 35%, #434C5E)'],
+  ['--dsw-alias-illustration-inset', P.nord6, P.nord3],
+  ['--dsw-alias-illustration-shadow', P.nord4, P.nord1],
 ]
 
 /**
