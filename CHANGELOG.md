@@ -6,6 +6,23 @@
 格式参考 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/)，版本号遵循
 [语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### 修复
+
+- **余额条在 dsh `0.2.2-rc.2` 上整条消失**。rc.2 的 `@deepseek-ai/dsh-client-ui-primitives` 删掉了 `useAnchoredPosition`
+  （浮层定位改由 `Menu` 内部的 CSS Anchor Positioning 承担，公共 API 只剩 `useAnchoredMaxHeight` 与 `useDismissOnOutsidePointer`），
+  余额条无条件调用它，渲染期抛错后被槽位错误边界隔离成空 div：主题、设置卡、导航图标照常，唯独余额读数不见了。
+  定位与「点外部关闭」两个 hook 改为内联在 `src/client/anchored.ts`，余额条不再向 primitives 取 hook——对 `0.2.1` /
+  `0.2.2-rc.1` 同样成立。
+
+### 文档 / 工程
+
+- 兼容性核查推进到 dsh `0.2.2-rc.2`：构建基线从 `0.2.2-rc.1` 升到 `0.2.2-rc.2`。新增的 peer `dsh-brand` / `dsh-session`
+  显式写进 devDependencies，否则 `npm install` 会 `ERESOLVE`（见 [COMPAT-0.2.2-rc.2.md](./COMPAT-0.2.2-rc.2.md)）。
+- dock 槽位声明与出口、`slots.register` / `inject(sessionId, actions)` 契约、主题 token 覆盖接口、Host 的 `/nord/balance`
+  路由本轮**零变化**，已逐条取证。
+
 ## [0.4.3] - 2026-11-06
 
 ### 修复
