@@ -91,7 +91,7 @@ profile 里装的是 `link:`，直接指回本目录，所以构建产物一落�
 0.2.2 补上了缺口：新增 `settings.section.icon` 槽位（0.2.2-alpha.3 起），按 id 与 `settings.section` 配对，命中时**顶替**默认字形，没命中才渲染齿轮。所以图标现在有两条路，画的是同一份几何（`src/client/nav-icon.tsx`）：
 
 - **0.2.2+**：往 `settings.section.icon` 注册一个 `NavIcon` 组件，shell 自己把按钮、`span[aria-hidden]` 包装和位置都管了。组件收到 `size`（16）与 `active`，只用 `size`——宿主自带的图标是单字重，靠 `currentColor` 跟着行变色，这里保持一致。
-- **0.1.7 / 0.2.0 / 0.2.1**：DOM 补丁。按两套字典里的导航标题找到**设置面板 nav 里自己那一行**（作用域先取 `[data-shortcut-modal="settings"]`，旧宿主退回 `[role="dialog"] nav`，避免扫到侧栏里同名的会话），打一个 `data-dsh-nord-nav` 属性；样式表再把那一行里的 svg（齿轮）藏掉，用 `::before` + mask 画出调色板字形（`navStylesheet`）。字形的几何按宿主自己的图标来：16px 盒、约 1.3px 描边、`currentColor`，所以悬停/选中跟行一起变色。用属性而不是类名，因为 shell 的 nav 类名是 CSS Module 哈希，每次发版都会变。
+- **0.2.0 / 0.2.1**：DOM 补丁。按两套字典里的导航标题找到**设置面板 nav 里自己那一行**（作用域先取 `[data-shortcut-modal="settings"]`，旧宿主退回 `[role="dialog"] nav`，避免扫到侧栏里同名的会话），打一个 `data-dsh-nord-nav` 属性；样式表再把那一行里的 svg（齿轮）藏掉，用 `::before` + mask 画出调色板字形（`navStylesheet`）。字形的几何按宿主自己的图标来：16px 盒、约 1.3px 描边、`currentColor`，所以悬停/选中跟行一起变色。用属性而不是类名，因为 shell 的 nav 类名是 CSS Module 哈希，每次发版都会变。
 
 两条路用**行里有没有自己那个图标**来区分（`NavIcon` 在根节点打 `data-dsh-nord-icon`，补丁只标记没有它的行），不看版本号：这样 0.2.2-alpha 那几版也不会两边同时生效。**这个判据来自一个实际踩到的 BUG**：0.2.2 把行结构改成了 `<button><span class=navIcon><svg/></span><span class=navLabel>`，旧规则 `button[data-dsh-nord-nav]>svg` 只匹配直接子节点，于是齿轮没被藏掉、`::before` 又画了一个颜料盘——左栏那一行同时出现两个图标。现在 0.2.2 上补丁整体不触发（槽位已经画好了），旧宿主仍走补丁；`verify-settings.mjs` 对两种形状分别断言「有且只有一个字形」。
 
@@ -144,21 +144,20 @@ div[data-slot="conversation.composer.dock"]:has(> [data-dsh-nord-bar]) {
 
 ## 版本现实
 
-本插件的**构建基线是 `0.2.2-rc.2`**，并**同时支持 `0.2.1-rc.5` 与 `0.2.0-rc.2`**；rc.2 上类型检查、单测与构建全绿，余额条与设置页在浏览器里实机验证；完整探针结果仍是 rc.1 那一轮（设置页全过、接口探针 8/9，「用量信息」座位仍在等一条有真实请求的夹具），0.2.1 / 0.2.0 上是既有结果。见「本地验证」。**`0.1.7` 已出窗**——基线升代后窗口是 `0.2.2 / 0.2.1 / 0.2.0`，那一代的兼容代码（插件自管字体层、导航图标 DOM 补丁）还在、装上去仍能用，删除留给下一个大版本，届时 `engines.dsh` 下限一并抬到 `>=0.2.0-0`。**`≤ 0.1.5`（含 `0.1.5-rc.1` / `rc.2` / `rc.3` 及更早）更早就不支持**——那一代没有 `configForms`，命名空间要靠 `installSection` + `settingsScope` 另一套接口，代码为此维护了两份 schema 与双份设置传输；而 dsh 发布频繁，没有必要为远古版本养一条并行分支。（`schemastery` 不用 dsh 的版本号，单独钉在 `3.19.0`；`cordis` 跟着上游的 `~` 摆动钉在 `4.1.0`——0.2.2 的每个包都 peer `cordis@~4.1.0`，留在 4.0.5 会直接 `ERESOLVE`。）
+本插件的**构建基线是 `0.2.2-rc.2`**，并**同时支持 `0.2.1-rc.5` 与 `0.2.0-rc.2`**；rc.2 上类型检查、单测与构建全绿，余额条与设置页在浏览器里实机验证；完整探针结果仍是 rc.1 那一轮（设置页全过、接口探针 8/9，「用量信息」座位仍在等一条有真实请求的夹具），0.2.1 / 0.2.0 上是既有结果。见「本地验证」。**`0.1.7` 已出窗，本轮把那一代专属的兼容代码也删了**——基线升代后窗口是 `0.2.2 / 0.2.1 / 0.2.0`；0.1.7 独有的只剩图标名的单字重回退（`IconChevronDownOutline`），已随 `CaretDown` 的解析链一并删掉，`engines.dsh` 下限同时抬到 `>=0.2.0-0`。插件自管字体层与导航图标 DOM 补丁是 0.2.0 / 0.2.1 仍需要的，不算 0.1.7 专属，保留。**`≤ 0.1.5`（含 `0.1.5-rc.1` / `rc.2` / `rc.3` 及更早）更早就不支持**——那一代没有 `configForms`，命名空间要靠 `installSection` + `settingsScope` 另一套接口，代码为此维护了两份 schema 与双份设置传输；而 dsh 发布频繁，没有必要为远古版本养一条并行分支。（`schemastery` 不用 dsh 的版本号，单独钉在 `3.19.0`；`cordis` 跟着上游的 `~` 摆动钉在 `4.1.0`——0.2.2 的每个包都 peer `cordis@~4.1.0`，留在 4.0.5 会直接 `ERESOLVE`。）
 
-**支持下限同时写进 `package.json` 的 `engines.dsh: ">=0.1.7-0"`**：dsh 0.2.1 起安装/启动会按它判定兼容性（`engines.dsh` 存在时独占判定、忽略 `peerDependencies`；预发布版本参与区间比较，所以下限写成 `-0` 才能收下 `0.1.7-rc.2`），不满足时拒绝并提示 `dsh plugin allow-version` 豁免；0.1.7 / 0.2.0 的装载器不读这个字段，所以那两个版本照常可用（0.1.5 也不读，因此它拦不住 0.4.x 的安装——那里只能靠文档劝退，请用 0.3.x）。改这个区间前先拿 `packages/boot/app-boot/src/plugin-compatibility.ts` 的 `evaluatePluginCompatibility()` 对四个版本（`0.1.5-rc.3` 应被拒，`0.1.7-rc.2` / `0.2.0-rc.2` / `0.2.1-rc.5` / `0.2.2-rc.1` / `0.2.2-rc.2` 应通过）各跑一遍。
+**支持下限同时写进 `package.json` 的 `engines.dsh: ">=0.2.0-0"`**：dsh 0.2.1 起安装/启动会按它判定兼容性（`engines.dsh` 存在时独占判定、忽略 `peerDependencies`；预发布版本参与区间比较，所以下限写成 `-0` 才能收下 `0.2.0-rc.2`），不满足时拒绝并提示 `dsh plugin allow-version` 豁免；0.2.0 的装载器不读这个字段，所以它照常可用（0.1.7 / 0.1.5 也不读，因此拦不住 0.4.x 的安装——那里只能靠文档劝退，请用 0.3.x）。改这个区间前先拿 `packages/boot/app-boot/src/plugin-compatibility.ts` 的 `evaluatePluginCompatibility()` 对这几个版本（`0.1.5-rc.3` / `0.1.7-rc.2` 应被拒，`0.2.0-rc.2` / `0.2.1-rc.5` / `0.2.2-rc.1` / `0.2.2-rc.2` 应通过）各跑一遍。
 
 | dsh | 设置命名空间 | 备注 |
 |---|---|---|
-| `0.1.7-rc.2` | Loader 从条目导出的 `Config` 自动派生，写 profile 的 `cordis.patch.yml`；浏览器 `ctx.configForms.get()` | 出窗：代码仍在、加载器不读 `engines.dsh`，删除留给下一个大版本 |
-| `0.2.0-rc.2` | 同上 | 配色表新增 8 枚 alias token |
+| `0.2.0-rc.2` | Loader 从条目导出的 `Config` 自动派生，写 profile 的 `cordis.patch.yml`；浏览器 `ctx.configForms.get()` | 配色表新增 8 枚 alias token；支持窗口的下限，0.1.7 一代的代码本轮已删 |
 | `0.2.1-rc.5` | 同上 | 字体设置归 dsh 自己：字体 token 从 `:root` 挪到 `body`，General 新增字体与三档字号行。插件按页面启动图里的 Host release 识别该代，**完全不碰字体**。`rc.2 → rc.4` 只动了标题栏视图 tab 行与 Tooltip/Menu；`rc.4 → rc.5` 只有整仓版本号 bump 加一处思考块渲染改造（`conversation.chat.reasoning.body` 的 owner props 多一个 `rawText`），插件不站那条槽位 —— 两轮契约面都未变（[COMPAT-0.2.1-rc.5.md](COMPAT-0.2.1-rc.5.md)、[COMPAT-0.2.1-rc.4.md](COMPAT-0.2.1-rc.4.md)） |
 | `0.2.2-rc.1` | 同上 | 设置左栏有了官方图标槽位 `settings.section.icon`，插件改为注册组件、DOM 补丁只留给旧代；配色表新增 6 枚插画 alias 与 `state-done-primary`，删掉 1 枚上游已删的 `specific-sidebar-nav-item-hover`；cordis 4.0.5 → 4.1.0（fiber 内部重构，公开 API 未变）、schemastery 3.18.5 → 3.19.0；`ui-conversation` 大改但 dock 行结构与槽位未变，`ui-renderer` / `ui-slots` / `dsh-client-store` / `dsh-credentials` 源码零 diff（[COMPAT-0.2.2-rc.1.md](COMPAT-0.2.2-rc.1.md)） |
 | `0.2.2-rc.2` | 同上 | 补丁周期：`primitives` 删除 `useAnchoredPosition`（浮层定位进 `Menu` 的 CSS Anchor Positioning，公共 API 只剩 `useAnchoredMaxHeight`），余额条的两个浮层 hook 内联进 `src/client/anchored.ts`；模块表新增 `dsh-client-ui-dockkit`（插件不 require）；`dsh-settings` 新增精确 peer `dsh-brand` / `dsh-session`，需显式写进 devDependencies。dock 槽位、`slots.register` / `inject(sessionId, actions)`、主题 token、Host 路由零变化（[COMPAT-0.2.2-rc.2.md](COMPAT-0.2.2-rc.2.md)） |
 
 **基线跟着最新一代走**，理由很实际：旧代随时可能把插件依赖的东西删掉，而类型面看不见运行时早已走另一条分支的漂移。升基线时让 `npm run typecheck` 先暴露这类删除，比等用户在旧代上踩到更便宜。支持窗口约定为「当前基线 + 两代回退」（现在是 0.2.2 / 0.2.1 / 0.2.0），再老就删代码，不再平移兼容层。
 
-设置不再有跨代分支：0.1.7 起 `ctx.configForms.get(entryId)` 是唯一入口，字段表只有一份 schema，每个字段都带 `.volatile()`（否则整个命名空间会被 `describe()` 过滤掉）。
+设置不再有跨代分支：`ctx.configForms.get(entryId)` 是唯一入口（这个接口从 0.1.7 起取代了 `installSection` + `settingsScope`），字段表只有一份 schema，每个字段都带 `.volatile()`（否则整个命名空间会被 `describe()` 过滤掉）。
 
 **字体是唯一的按版本判断处**（`src/client/host-fonts.ts` + `src/fonts.ts` 的 `hostOwnsFonts`）：0.2.1 把字体 token 从 `:root` 挪到 `body` 并自带字体设置，而这件事在类型上完全不可见；只看形状也分不干净（0.2.0 同样有 `theme` 服务，只是快照里没有 `fontFamilies`）。所以先读页面启动图里的 Host release（`window.__DSH_BOOT__.release.version`，0.2.1 才有），`>= 0.2.1` 即让位；没有 release 的页面再用「主题快照是否带 `fontFamilies`」作能力兜底。
 
@@ -185,7 +184,7 @@ node scripts/shots/verify-settings.mjs
 **五处类型与探针都看不见、升级时值得主动查的东西：**
 
 - **新增/删除的配色 token。** 上游只往 `ui-theme/src/styles/design-platform.css` 里加，而探针只抽样十几个，抽不到新加的。做法是拿两个 tag 比这份文件（`git diff dsh-v<旧>..dsh-v<新> -- packages/client/ui-theme/src/styles/design-platform.css | grep -E '^[-+]\s+--dsw-'`）：新增的 alias 若没被这层覆盖，就会露出非 Nord 的颜色，**被删的那个则变成一条没人读的死覆盖**。0.2.0 加了 8 枚（4 枚需补）；0.2.2 加了 6 枚插画 alias 加 `state-done-primary`（都要补），并删掉了 `--dsw-specific-sidebar-nav-item-hover`（本层原本覆盖着它，本轮清掉）。
-- **图标名。** ui-primitives 改过一次名字（0.1.7 的 `IconChevronDownOutline` → 0.2.0 拆成 `…Regular` / `…Medium`），两代之间没有一个名字通用。`NordSection.tsx` 按「新→旧→本地兜底」解析，所以不会崩，但宿主重画时会静默退回兜底那份（退回时肉眼一样，是以后的隐患）。
+- **图标名。** ui-primitives 改过一次名字（0.1.7 的 `IconChevronDownOutline` → 0.2.0 拆成 `…Regular` / `…Medium`）；`0.1.7` 出窗后只剩一种写法，`NordSection.tsx` 只解析 `…Regular`，再退回本地 SVG（本地那份是宿主字形的等比复制）。宿主若再重画图标，核对点就只有这一个名字；退回兜底时肉眼一样，仍是以后的隐患。
 - **设置左栏的导航行结构。** 0.2.2 正是把这件事改了：行里多了一层 `span.navIcon`，并且给出了 `settings.section.icon` 槽位——旧的「藏掉直接子 svg」规则当场失效，两个图标同时出现（见上文「设置页占一整页」）。现在 0.2.2+ 走槽位、旧代走补丁，判据是行里有没有 `data-dsh-nord-icon`。以后要查的是**槽位本身**：`settings.section.icon` 的 owner props 是否还是 `{ size, active }`、shell 是否仍然「命中就顶替默认字形」，以及 `SettingsRoot.tsx` 的行结构是否又变了（补丁那条路会静默退回齿轮）。
 - **body 级的字体 token。** 0.2.1 在 `ui-theme/src/styles/base.css:29-31` 的 `body` 上重新声明 `--dsw-font-family` / `--ds-font-family-code`（值引用新的 `--dsh-font-family-*-default`）。插件写 `:root` 的覆盖会被 body 自己的声明压掉：界面与代码字体**静默**退回上游默认栈，没有任何报错，而只读 `documentElement` 的旧探针会给出假绿灯。0.2.1 起插件整体让位（`src/client/host-fonts.ts`），探针按宿主 release 分支：宿主自管时断言「不注入字体层、body 不是插件栈、设置页只剩说明」，旧版才断言插件字体生效。
 - **那条宽表格补丁。** 它绑在上游「静止藏条、悬停显条」的做法上；上游若改了 `md-table-wide` 钩子或取消悬停切换，就要重新评估这条规则是删还是改写。

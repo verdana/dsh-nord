@@ -4,7 +4,7 @@
 
 [中文](https://github.com/verdana/dsh-nord/blob/main/README.md) | **English**
 
-A Nord repaint for the [dsh](https://github.com/deepseek-ai/deepseek-harness) Web GUI: the Nord palette, a settings page of its own, and a DeepSeek balance readout under the composer. From dsh **0.2.1** the host manages fonts and sizes itself; on 0.1.7 / 0.2.0 this plugin still provides font replacement. Only dsh **0.1.7 / 0.2.0 / 0.2.1** are supported; `≤ 0.1.5` has been unsupported since 0.4.0.
+A Nord repaint for the [dsh](https://github.com/deepseek-ai/deepseek-harness) Web GUI: the Nord palette, a settings page of its own, and a DeepSeek balance readout under the composer. From dsh **0.2.1** the host manages fonts and sizes itself; on 0.2.0 this plugin still provides font replacement. Only dsh **0.2.0 / 0.2.1 / 0.2.2** are supported; `0.1.7` and older are no longer supported.
 
 > Version and per-release changes live in [CHANGELOG.md](./CHANGELOG.md); the latest version on npm is the badge above.
 
@@ -15,7 +15,7 @@ A Nord repaint for the [dsh](https://github.com/deepseek-ai/deepseek-harness) We
 - **Nord palette** —— 132 design tokens (93 semantic aliases, 10 named surfaces, 29 raw-scale patches), one set for light and one for dark, following dsh's own *Appearance* setting. No hard-coded colors, no DOM surgery, and uninstalling restores everything.
 - **Selectable fonts** —— Interface font and code font are chosen separately: follow the system, one of eight presets (Maple Mono, JetBrains Mono, Cascadia Code, Fira Code, Sarasa Gothic, LXGW WenKai, HarmonyOS Sans, MiSans), or your own CSS `font-family` string. A preset is a full fallback stack, so a family you don't have installed drops through to the next one, with CJK fallbacks appended by the plugin; every row in the dropdown renders in its own font, so you see the real result before you pick it. The UI font size still derives from dsh's *Font size* setting.
 
-  > Starting with dsh **0.2.1**, the host ships its own font and size settings (Settings → General settings → Font size as of 0.2.2), and this plugin steps aside: it injects no font stylesheet at all and the settings page's font group keeps a single explanatory line. On older supported hosts (0.1.7 / 0.2.0) the plugin still provides font replacement.
+  > Starting with dsh **0.2.1**, the host ships its own font and size settings (Settings → General settings → Font size as of 0.2.2), and this plugin steps aside: it injects no font stylesheet at all and the settings page's font group keeps a single explanatory line. On the other supported host (0.2.0) the plugin still provides font replacement.
 - **Balance readout** —— Below the composer, on the same row as the official turn/step stats. Click it for a detail panel. With a DeepSeek model (or when the balance endpoint itself is DeepSeek), the panel gains a *Usage* row linking to [platform.deepseek.com/usage](https://platform.deepseek.com/usage); panels for other providers are left untouched.
 
   ![Balance detail](assets/03-balance.png)
@@ -30,7 +30,7 @@ A Nord repaint for the [dsh](https://github.com/deepseek-ai/deepseek-harness) We
 
 ## Requirements
 
-- Supported dsh: **`0.2.2-rc.2`** (the build baseline, balance bar and settings verified on a live instance), **`0.2.1-rc.5`**, and **`0.2.0-rc.2`**, each tested as well; **`0.1.7` has left the tested window** (its code path is still there and it still runs; the deletion is deferred to the next major), and **`≤ 0.1.5` has been unsupported since 0.4.0** — see [Compatibility](#compatibility).
+- Supported dsh: **`0.2.2-rc.2`** (the build baseline, balance bar and settings verified on a live instance), **`0.2.1-rc.5`**, and **`0.2.0-rc.2`**, each tested as well; **`0.1.7` and older are no longer supported** (the `engines.dsh` floor is now `>=0.2.0-0` and that generation's compatibility code has been removed) — see [Compatibility](#compatibility).
 - The balance readout needs `DEEPSEEK_API_KEY` (resolved through dsh's credentials service). Without credentials the bar shows an error message; theme, fonts, and settings are unaffected.
 
 ### Compatibility
@@ -40,12 +40,11 @@ A Nord repaint for the [dsh](https://github.com/deepseek-ai/deepseek-harness) We
 | `0.2.2` | Build baseline (`rc.2` tested) | Font family and size are managed by dsh's own settings; the plugin injects none |
 | `0.2.1` | Tested (`rc.5`) | Same as above |
 | `0.2.0` | Tested (`rc.2`) | The plugin provides font replacement (interface / code fonts) |
-| `0.1.7` | Out of window: code still present, no longer tested | Same as above |
-| `≤ 0.1.5` | **Unsupported since 0.4.0** (every `0.1.5-rc.1` / `rc.2` / `rc.3` and older) | — |
+| `0.1.7` and older | **Unsupported** (`0.4.0` dropped the `≤ 0.1.5` generation, this round dropped `0.1.7`) | — |
 
-0.4.0 removed the 0.1.5 compatibility code: that generation exposed the settings namespace through a different pair of interfaces (Host `installSection` plus browser `settingsScope`), which the plugin had to support with two schemas and two transports. **dsh releases very frequently, so the plugin only keeps the current baseline plus two generations of fallback and does not maintain compatibility with older releases.** With the baseline now at `0.2.2`, that window is `0.2.2` / `0.2.1` / `0.2.0`, so `0.1.7` drops out; its loader never read `engines.dsh`, and removing its code path is left to the next major.
+0.4.0 removed the 0.1.5 compatibility code: that generation exposed the settings namespace through a different pair of interfaces (Host `installSection` plus browser `settingsScope`), which the plugin had to support with two schemas and two transports. **dsh releases very frequently, so the plugin only keeps the current baseline plus two generations of fallback and does not maintain compatibility with older releases.** With the baseline now at `0.2.2`, that window is `0.2.2` / `0.2.1` / `0.2.0`, so `0.1.7` drops out. This round removed that generation's compatibility code (the single-weight icon fallback) and raised the `engines.dsh` floor from `>=0.1.7-0` to `>=0.2.0-0`.
 
-The floor is also declared in `package.json` as `engines.dsh` (`>=0.1.7-0`): dsh 0.2.1 and newer refuse older hosts at install and startup, pointing at `dsh plugin allow-version` for an exact-version exemption (for temporary verification only; it does not restore compatibility). 0.1.7 / 0.2.0 do not read that field, so they keep working as before. **0.1.5 does not read it either, so it cannot block a 0.4.x install — do not upgrade on 0.1.5; stay on plugin 0.3.x.** The fuller version history is in [DEVELOPMENT.md](DEVELOPMENT.md#版本现实) (Chinese).
+The floor is also declared in `package.json` as `engines.dsh` (`>=0.2.0-0`): dsh 0.2.1 and newer refuse older hosts at install and startup, pointing at `dsh plugin allow-version` for an exact-version exemption (for temporary verification only; it does not restore compatibility). 0.2.0 does not read that field, so it keeps working as before. **0.1.7 / 0.1.5 do not read it either, so it cannot block a 0.4.x install — do not upgrade below 0.2.0; stay on plugin 0.3.x.** The fuller version history is in [DEVELOPMENT.md](DEVELOPMENT.md#版本现实) (Chinese).
 
 ## Install
 
@@ -88,9 +87,9 @@ dsh plugin --profile web remove dsh-nord
 dsh plugin --profile web add dsh-nord
 ```
 
-If dsh is still on `≤ 0.1.5`, do not move to 0.4.x: upgrade dsh to 0.1.7 or newer first, or stay on plugin 0.3.x (0.1.5 does not read `engines.dsh`, so it will not block this install).
+If dsh is still below `0.2.0`, do not move to 0.4.x: upgrade dsh to 0.2.0 or newer first, or stay on plugin 0.3.x (a pre-0.2.0 host does not read `engines.dsh`, so it will not block this install).
 
-After installing, open Settings and confirm the *Nord theme* page is there: on 0.2.1 the font group is one explanatory line and fonts are chosen in Settings → General settings → Font size; on 0.2.0 / 0.1.7 the plugin's own font menus remain and keep their stored choices.
+After installing, open Settings and confirm the *Nord theme* page is there: on 0.2.1 the font group is one explanatory line and fonts are chosen in Settings → General settings → Font size; on 0.2.0 the plugin's own font menus remain and keep their stored choices.
 
 ## Settings
 

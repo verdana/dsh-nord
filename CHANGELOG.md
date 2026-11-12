@@ -8,6 +8,12 @@
 
 ## [Unreleased]
 
+### 移除
+
+- 删除 `0.1.7` 一代的兼容代码：`CaretDown` 不再回退到 0.1.7 的单字重图标名 `IconChevronDownOutline`，`engines.dsh`
+  下限从 `>=0.1.7-0` 抬到 `>=0.2.0-0`。支持窗口现为 `0.2.2` / `0.2.1` / `0.2.0`；`0.1.7` 及更早不再支持
+  （dsh 0.2.1 起会按 `engines.dsh` 拒绝安装，更早的宿主不读该字段，只能靠文档劝退）。
+
 ### 修复
 
 - **余额条在 dsh `0.2.2-rc.2` 上整条消失**。rc.2 的 `@deepseek-ai/dsh-client-ui-primitives` 删掉了 `useAnchoredPosition`
