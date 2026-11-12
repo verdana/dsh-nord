@@ -33,29 +33,24 @@ import { SETTINGS_ATTR } from './nord.ts'
 import type { createNordSettingsStore } from './stores.ts'
 import { PLUGIN_VERSION } from './version.ts'
 
-/** Geometry of the caret drawn when the host ships neither icon name below. */
+/** Geometry of the caret drawn when the host ships no icon below. */
 const CARET_SIZE = 14
 
 /**
  * The menu trigger's caret.
  *
- * ui-primitives has renamed its icon set once across the generations this plugin
- * supports: 0.1.7 spells the glyph `IconChevronDownOutline`, and 0.2.0 split
- * every glyph into two weights (`IconChevronDownOutlineRegular` / `…Medium`).
- * Resolve whichever this host ships and keep each version's own drawing — newest
- * first, because a host that ships both spellings is one that is midway through
- * a rename.
+ * Every supported host (0.2.x) ships `IconChevronDownOutlineRegular`; the
+ * single-weight spelling 0.1.7 used (`IconChevronDownOutline`) is gone with
+ * that generation.
  *
- * The last resort is a copy of the newest artwork rather than nothing: importing
+ * The last resort is a copy of the host artwork rather than nothing: importing
  * a name the host does not export yields `undefined`, and passing that as a
  * component type is React error #130 — which takes the whole settings page down
  * with it. A cosmetic caret is not worth that. Its 14px/1px-stroke geometry is
- * what `IconChevronDownOutlineRegular` draws, so the fallback is the host glyph
- * rather than a lookalike.
+ * what the host glyph draws, so the fallback is a lookalike of it.
  */
 const CaretDown: ComponentType<{ size?: number; className?: string }> =
   (primitives as unknown as Record<string, ComponentType<{ size?: number; className?: string }> | undefined>).IconChevronDownOutlineRegular
-  ?? (primitives as unknown as Record<string, ComponentType<{ size?: number; className?: string }> | undefined>).IconChevronDownOutline
   ?? (() => (
     <svg width={CARET_SIZE} height={CARET_SIZE} viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <path d="M4 6L7.29289 9.29289C7.68342 9.68342 8.31658 9.68342 8.70711 9.29289L12 6" stroke="currentColor" strokeWidth={1} />

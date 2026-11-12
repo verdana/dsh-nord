@@ -115,9 +115,9 @@ export function apply(ctx: ClientContext): void {
     // The settings rail glyph. dsh 0.2.2 carries one for this: a
     // `settings.section.icon` entry addressed by this section's id, rendered by
     // the shell in place of the gear it gives every unrecognised id. The
-    // injection waits for that slot, so on 0.1.7 / 0.2.0 / 0.2.1 — which declare
-    // no such slot — this callback simply never runs and the DOM patch below
-    // draws the glyph instead. See `nav-icon.tsx`.
+    // injection waits for that slot, so on 0.2.0 / 0.2.1 — which declare no such
+    // slot — this callback simply never runs and the DOM patch below draws the
+    // glyph instead. See `nav-icon.tsx`.
     ctx.slots.inject('settings.section.icon', () => ctx.slots.register({
       name: 'settings.section.icon',
       id: SECTION_ID,
@@ -224,7 +224,7 @@ export function apply(ctx: ClientContext): void {
           // chains, and a rejection is turned into the page's own failure line
           // here, so a caller that ignores the promise leaves no unhandled one.
           //
-          // The boolean 0.1.7 answers is deliberately ignored: it is `false`
+          // The resolved flag is deliberately ignored: it is `false`
           // both for a refused write and for one a newer write superseded, and
           // the controller folds the Host's own state back in either way. The
           // mirror's next sync publishes whatever actually stands, so reporting

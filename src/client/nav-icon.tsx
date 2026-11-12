@@ -16,7 +16,7 @@
  * section the generic gear; the `settings.section` slot carried no icon option.
  * The only way in was a DOM patch: find this plugin's row by its label, mark it,
  * hide the gear, draw the glyph as a `::before` mask. That path is still here for
- * 0.1.7 / 0.2.0 / 0.2.1 and is described in {@link navStylesheet}.
+ * 0.2.0 / 0.2.1 and is described in {@link navStylesheet}.
  *
  * 0.2.2 (first shipped in `0.2.2-alpha.3`) added the `settings.section.icon`
  * slot: a list of components addressed by the matching `settings.section` id,

@@ -264,8 +264,8 @@ const TOKENS: readonly (readonly [name: string, light: string, dark: string])[] 
   ['--dsw-static-blue-500', P.nord10, P.nord8],
   ['--dsw-static-blue-900', P.nord10, P.nord9],
 
-  // dsh 0.2.0 additions. The palette gained these eight alias tokens after
-  // 0.1.7; these four are the ones that do not land on Nord by themselves. The
+  // dsh 0.2.0 additions. Of the eight alias tokens the palette gained, these
+  // four do not land on Nord by themselves. The
   // menu group header is a hardcoded neutral in the palette, so no alias of this
   // layer can reach it; the three label tokens mix in static rungs this layer
   // deliberately leaves alone (`neutral-1000`, `blue-950`, `blue-300`), or read

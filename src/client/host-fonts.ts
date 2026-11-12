@@ -8,8 +8,9 @@
  * own font rows behind one explanatory line.
  *
  * The signal is the Host release the page booted from (`window.__DSH_BOOT__`),
- * which 0.2.1 publishes and older generations do not. A shell that publishes no
- * release is asked the capability question instead — whether its theme snapshot
+ * which 0.2.1 publishes and 0.2.0 does not. A shell that publishes no release
+ * (0.2.0, or a 0.2.1 pre-release) is asked the capability question instead —
+ * whether its theme snapshot
  * carries the per-role `fontFamilies` the font settings introduced — so a
  * pre-release build that already shipped the font system still delegates even if
  * it predates the release field.
