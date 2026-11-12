@@ -16,6 +16,11 @@
   定位与「点外部关闭」两个 hook 改为内联在 `src/client/anchored.ts`，余额条不再向 primitives 取 hook——对 `0.2.1` /
   `0.2.2-rc.1` 同样成立。
 
+### 变更
+
+- 设置页里字体委托说明的菜单路径改为「设置 → 通用设置 → 字号大小」（英文同步 `Settings → General settings → Font size`），
+  与 dsh 0.2.2 的实际菜单一致。
+
 ### 文档 / 工程
 
 - 兼容性核查推进到 dsh `0.2.2-rc.2`：构建基线从 `0.2.2-rc.1` 升到 `0.2.2-rc.2`。新增的 peer `dsh-brand` / `dsh-session`

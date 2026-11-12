@@ -98,10 +98,13 @@ console.error(`slot entry crashed in '${this.props.slotKey}':`, error)
 |---|---|
 | `npx tsc -p tsconfig.json`（对 `0.2.2-rc.2` 的 typings） | 通过 |
 | `npm test`（`node --test tests/*.test.mjs`） | 38 / 38 通过 |
-| `npm run build`（tsdown） | 通过；`lib/client.js` 91.80 kB |
+| `npm run build`（tsdown） | 通过；`lib/client.js` 91.82 kB |
 | 构建产物的 `require` 表 | `react` / `react-dom` / `react/jsx-runtime` / `@deepseek-ai/dsh-client-ui-primitives` / `@deepseek-ai/dsh-client-store`，与 shell 模块表一一对应 |
 | 产物里的 primitives 取用 | 只剩 `Button` / `Input` / `Menu` / `Switch` / `IconChevronDownOutlineRegular` / `IconChevronDownOutline`（后者仅作老宿主回退），**不再取 `useAnchoredPosition`** |
 | `GET /nord/balance`（跑着的 rc.2） | `200`，`{"currency":"CNY","total":"14.30",…,"available":true}` |
+| 浏览器实机（本机 rc.2 的 Web GUI） | 余额条恢复渲染、明细面板与设置页正常，用户确认 |
+
+两个探针（`scripts/shots/verify-compat.mjs` / `verify-settings.mjs`）本轮**没有在 rc.2 上复跑**：基线的证据是类型面、单测、构建与浏览器实机，探针复跑留给下一轮。
 
 ## 4. 留给下一轮
 

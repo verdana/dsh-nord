@@ -144,9 +144,9 @@ div[data-slot="conversation.composer.dock"]:has(> [data-dsh-nord-bar]) {
 
 ## 版本现实
 
-本插件的**构建基线是 `0.2.2-rc.1`**，并**同时支持 `0.2.1-rc.5` 与 `0.2.0-rc.2`**；每一代都用两个探针实跑过（rc.1 上设置页探针全过、接口探针 8/9，「用量信息」座位仍在等一条有真实请求的夹具；0.2.1 / 0.2.0 上是既有结果。见「本地验证」）。**`0.1.7` 已出窗**——基线升代后窗口是 `0.2.2 / 0.2.1 / 0.2.0`，那一代的兼容代码（插件自管字体层、导航图标 DOM 补丁）还在、装上去仍能用，删除留给下一个大版本，届时 `engines.dsh` 下限一并抬到 `>=0.2.0-0`。**`≤ 0.1.5`（含 `0.1.5-rc.1` / `rc.2` / `rc.3` 及更早）更早就不支持**——那一代没有 `configForms`，命名空间要靠 `installSection` + `settingsScope` 另一套接口，代码为此维护了两份 schema 与双份设置传输；而 dsh 发布频繁，没有必要为远古版本养一条并行分支。（`schemastery` 不用 dsh 的版本号，单独钉在 `3.19.0`；`cordis` 跟着上游的 `~` 摆动钉在 `4.1.0`——0.2.2 的每个包都 peer `cordis@~4.1.0`，留在 4.0.5 会直接 `ERESOLVE`。）
+本插件的**构建基线是 `0.2.2-rc.2`**，并**同时支持 `0.2.1-rc.5` 与 `0.2.0-rc.2`**；rc.2 上类型检查、单测与构建全绿，余额条与设置页在浏览器里实机验证；完整探针结果仍是 rc.1 那一轮（设置页全过、接口探针 8/9，「用量信息」座位仍在等一条有真实请求的夹具），0.2.1 / 0.2.0 上是既有结果。见「本地验证」。**`0.1.7` 已出窗**——基线升代后窗口是 `0.2.2 / 0.2.1 / 0.2.0`，那一代的兼容代码（插件自管字体层、导航图标 DOM 补丁）还在、装上去仍能用，删除留给下一个大版本，届时 `engines.dsh` 下限一并抬到 `>=0.2.0-0`。**`≤ 0.1.5`（含 `0.1.5-rc.1` / `rc.2` / `rc.3` 及更早）更早就不支持**——那一代没有 `configForms`，命名空间要靠 `installSection` + `settingsScope` 另一套接口，代码为此维护了两份 schema 与双份设置传输；而 dsh 发布频繁，没有必要为远古版本养一条并行分支。（`schemastery` 不用 dsh 的版本号，单独钉在 `3.19.0`；`cordis` 跟着上游的 `~` 摆动钉在 `4.1.0`——0.2.2 的每个包都 peer `cordis@~4.1.0`，留在 4.0.5 会直接 `ERESOLVE`。）
 
-**支持下限同时写进 `package.json` 的 `engines.dsh: ">=0.1.7-0"`**：dsh 0.2.1 起安装/启动会按它判定兼容性（`engines.dsh` 存在时独占判定、忽略 `peerDependencies`；预发布版本参与区间比较，所以下限写成 `-0` 才能收下 `0.1.7-rc.2`），不满足时拒绝并提示 `dsh plugin allow-version` 豁免；0.1.7 / 0.2.0 的装载器不读这个字段，所以那两个版本照常可用（0.1.5 也不读，因此它拦不住 0.4.x 的安装——那里只能靠文档劝退，请用 0.3.x）。改这个区间前先拿 `packages/boot/app-boot/src/plugin-compatibility.ts` 的 `evaluatePluginCompatibility()` 对四个版本（`0.1.5-rc.3` 应被拒，`0.1.7-rc.2` / `0.2.0-rc.2` / `0.2.1-rc.5` / `0.2.2-rc.1` 应通过）各跑一遍。
+**支持下限同时写进 `package.json` 的 `engines.dsh: ">=0.1.7-0"`**：dsh 0.2.1 起安装/启动会按它判定兼容性（`engines.dsh` 存在时独占判定、忽略 `peerDependencies`；预发布版本参与区间比较，所以下限写成 `-0` 才能收下 `0.1.7-rc.2`），不满足时拒绝并提示 `dsh plugin allow-version` 豁免；0.1.7 / 0.2.0 的装载器不读这个字段，所以那两个版本照常可用（0.1.5 也不读，因此它拦不住 0.4.x 的安装——那里只能靠文档劝退，请用 0.3.x）。改这个区间前先拿 `packages/boot/app-boot/src/plugin-compatibility.ts` 的 `evaluatePluginCompatibility()` 对四个版本（`0.1.5-rc.3` 应被拒，`0.1.7-rc.2` / `0.2.0-rc.2` / `0.2.1-rc.5` / `0.2.2-rc.1` / `0.2.2-rc.2` 应通过）各跑一遍。
 
 | dsh | 设置命名空间 | 备注 |
 |---|---|---|
@@ -154,6 +154,7 @@ div[data-slot="conversation.composer.dock"]:has(> [data-dsh-nord-bar]) {
 | `0.2.0-rc.2` | 同上 | 配色表新增 8 枚 alias token |
 | `0.2.1-rc.5` | 同上 | 字体设置归 dsh 自己：字体 token 从 `:root` 挪到 `body`，General 新增字体与三档字号行。插件按页面启动图里的 Host release 识别该代，**完全不碰字体**。`rc.2 → rc.4` 只动了标题栏视图 tab 行与 Tooltip/Menu；`rc.4 → rc.5` 只有整仓版本号 bump 加一处思考块渲染改造（`conversation.chat.reasoning.body` 的 owner props 多一个 `rawText`），插件不站那条槽位 —— 两轮契约面都未变（[COMPAT-0.2.1-rc.5.md](COMPAT-0.2.1-rc.5.md)、[COMPAT-0.2.1-rc.4.md](COMPAT-0.2.1-rc.4.md)） |
 | `0.2.2-rc.1` | 同上 | 设置左栏有了官方图标槽位 `settings.section.icon`，插件改为注册组件、DOM 补丁只留给旧代；配色表新增 6 枚插画 alias 与 `state-done-primary`，删掉 1 枚上游已删的 `specific-sidebar-nav-item-hover`；cordis 4.0.5 → 4.1.0（fiber 内部重构，公开 API 未变）、schemastery 3.18.5 → 3.19.0；`ui-conversation` 大改但 dock 行结构与槽位未变，`ui-renderer` / `ui-slots` / `dsh-client-store` / `dsh-credentials` 源码零 diff（[COMPAT-0.2.2-rc.1.md](COMPAT-0.2.2-rc.1.md)） |
+| `0.2.2-rc.2` | 同上 | 补丁周期：`primitives` 删除 `useAnchoredPosition`（浮层定位进 `Menu` 的 CSS Anchor Positioning，公共 API 只剩 `useAnchoredMaxHeight`），余额条的两个浮层 hook 内联进 `src/client/anchored.ts`；模块表新增 `dsh-client-ui-dockkit`（插件不 require）；`dsh-settings` 新增精确 peer `dsh-brand` / `dsh-session`，需显式写进 devDependencies。dock 槽位、`slots.register` / `inject(sessionId, actions)`、主题 token、Host 路由零变化（[COMPAT-0.2.2-rc.2.md](COMPAT-0.2.2-rc.2.md)） |
 
 **基线跟着最新一代走**，理由很实际：旧代随时可能把插件依赖的东西删掉，而类型面看不见运行时早已走另一条分支的漂移。升基线时让 `npm run typecheck` 先暴露这类删除，比等用户在旧代上踩到更便宜。支持窗口约定为「当前基线 + 两代回退」（现在是 0.2.2 / 0.2.1 / 0.2.0），再老就删代码，不再平移兼容层。
 
@@ -175,7 +176,7 @@ node scripts/shots/verify-settings.mjs
 精确版本的 peer 关系（例如 `dsh-settings@rc.5` peer `dsh-brand@0.2.1-rc.5`），而那些 peer 目标多是
 **传递依赖**、不在本仓库的 `package.json` 里，npm 不会主动替它们跟着升，于是解析器把「树里还剩旧
 版本」判成冲突。rc.4 → rc.5、`0.2.1-rc.5` → `0.2.2-rc.1` 各撞了一次；后者更麻烦，因为 0.2.2 的每个包
-还把 `cordis` 的 peer 抬到了 `~4.1.0`——那个得跟着换，清树解决不了。干净解法是先删 `node_modules` 与 `package-lock.json`
+还把 `cordis` 的 peer 抬到了 `~4.1.0`——那个得跟着换，清树解决不了。`0.2.2-rc.1` → `rc.2` 又因为 `dsh-settings` 新增的 `dsh-brand` / `dsh-session` 精确 peer 撞了一次，把这两枚显式写进 devDependencies 即可，不必清树。干净解法是先删 `node_modules` 与 `package-lock.json`
 再装 —— 两者都是可再生资产，比 `--force` 留下半新半旧的树可靠。
 
 **「五处」现在要看的东西里有四面已经出过事**（token 增删、图标名、设置左栏行结构、body 字体 token），
