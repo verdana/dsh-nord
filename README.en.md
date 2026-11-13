@@ -30,14 +30,14 @@ A Nord repaint for the [dsh](https://github.com/deepseek-ai/deepseek-harness) We
 
 ## Requirements
 
-- Supported dsh: **`0.2.2-rc.2`** (the build baseline, balance bar and settings verified on a live instance), **`0.2.1-rc.5`**, and **`0.2.0-rc.2`**, each tested as well; **`0.1.7` and older are no longer supported** (the `engines.dsh` floor is now `>=0.2.0-0` and that generation's compatibility code has been removed) — see [Compatibility](#compatibility).
+- Supported dsh: **`0.2.2-rc.3`** (the build baseline; build, type check and unit tests are green on `rc.3`), **`0.2.1-rc.5`**, and **`0.2.0-rc.2`**, each tested as well; **`0.1.7` and older are no longer supported** (the `engines.dsh` floor is now `>=0.2.0-0` and that generation's compatibility code has been removed) — see [Compatibility](#compatibility).
 - The balance readout needs `DEEPSEEK_API_KEY` (resolved through dsh's credentials service). Without credentials the bar shows an error message; theme, fonts, and settings are unaffected.
 
 ### Compatibility
 
 | dsh | Status | Fonts |
 |---|---|---|
-| `0.2.2` | Build baseline (`rc.2` tested) | Font family and size are managed by dsh's own settings; the plugin injects none |
+| `0.2.2` | Build baseline (`rc.3` tested) | Font family and size are managed by dsh's own settings; the plugin injects none |
 | `0.2.1` | Tested (`rc.5`) | Same as above |
 | `0.2.0` | Tested (`rc.2`) | The plugin provides font replacement (interface / code fonts) |
 | `0.1.7` and older | **Unsupported** (`0.4.0` dropped the `≤ 0.1.5` generation, this round dropped `0.1.7`) | — |
