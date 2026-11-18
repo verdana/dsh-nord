@@ -10,10 +10,11 @@
 
 ### 文档 / 工程
 
-- 兼容性核查推进到 dsh `0.2.2-rc.3`：构建基线从 `0.2.2-rc.2` 升到 `0.2.2-rc.3`，12 个 devDependencies 同步。
-  rc.3 相对 rc.2 只新增两枚 `upload-outline` 图标并推进包版本号，插件的四个契约面（primitives 导出、dock 槽位声明与出口、
-  槽位运行时、`overrideTokens`）逐字节相同，**插件代码零改动**（见 [COMPAT-0.2.2-rc.3.md](./COMPAT-0.2.2-rc.3.md)）。
-- rc.3 上构建、`tsc` 与 38 项单测全绿；运行中的 rc.3 宿主 `GET /nord/balance` 返回 200。
+- 兼容性核查推进到 dsh `0.2.2-rc.4`：构建基线从 `0.2.2-rc.3` 升到 `0.2.2-rc.4`，14 个 devDependencies 同步。
+  rc.4 相对 rc.3 只推进包版本号、给 LLM 错误码表加了一枚 `CONTENT_REFUSED`（插件不消费错误码），插件的四个契约面
+  （primitives 导出、dock 槽位声明与出口、槽位运行时、`overrideTokens`）与前端壳模块表逐字节相同，**插件代码零改动**
+  （见 [COMPAT-0.2.2-rc.4.md](./COMPAT-0.2.2-rc.4.md)）。
+- rc.4 上构建、`tsc` 与 38 项单测全绿；运行中的 rc.4 宿主 `GET /nord/balance` 返回 200。
 
 ## [0.4.4] - 2026-11-12
 
